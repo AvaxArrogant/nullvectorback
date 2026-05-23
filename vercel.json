@@ -1,0 +1,18 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "regions": ["iad1"],
+  "functions": {
+    "app/api/scan/route.js": {
+      "maxDuration": 30
+    },
+    "app/api/health/route.js": {
+      "maxDuration": 10
+    },
+    "app/api/market/route.js": {
+      "maxDuration": 30
+    }
+  }
+}
