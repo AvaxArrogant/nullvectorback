@@ -8,6 +8,7 @@ const categories = new Set([
   "Scan result feedback",
   "UI feedback",
   "Partnership",
+  "Manual audit request",
   "Other",
 ]);
 

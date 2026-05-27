@@ -122,6 +122,7 @@ const navItems = [
   ["Threat Graph", "#graph"],
   ["Modules", "#modules"],
   ["Trust", "#trust"],
+  ["Audit Seal", "#audit-seal"],
   ["Feedback", "#feedback"],
   ["Ecosystem", "#ecosystem"],
 ];
@@ -1233,6 +1234,8 @@ export default function Home() {
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState("contract");
   const [isFeedbackSending, setIsFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null);
+  const [isAuditRequestSending, setIsAuditRequestSending] = useState(false);
+  const [auditRequestStatus, setAuditRequestStatus] = useState(null);
   const [walletAddress, setWalletAddress] = useState("");
   const [walletProfile, setWalletProfile] = useState(null);
   const [walletError, setWalletError] = useState("");
@@ -1264,6 +1267,14 @@ export default function Home() {
   const [feedbackForm, setFeedbackForm] = useState({
     category: "Feature idea",
     email: "",
+    message: "",
+    website: "",
+  });
+  const [auditRequestForm, setAuditRequestForm] = useState({
+    project: "",
+    email: "",
+    contract: "",
+    docs: "",
     message: "",
     website: "",
   });
@@ -1592,6 +1603,45 @@ export default function Home() {
     }
   }
 
+  async function submitAuditRequest(event) {
+    event.preventDefault();
+    setIsAuditRequestSending(true);
+    setAuditRequestStatus(null);
+
+    const message = [
+      "Manual PulseShield audit request",
+      "",
+      `Project: ${auditRequestForm.project || "not provided"}`,
+      `Contract: ${auditRequestForm.contract || "not provided"}`,
+      `Docs: ${auditRequestForm.docs || "not provided"}`,
+      "",
+      "Project notes:",
+      auditRequestForm.message || "No notes provided.",
+    ].join("\n");
+
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          category: "Manual audit request",
+          email: auditRequestForm.email,
+          message,
+          website: auditRequestForm.website,
+          path: typeof window !== "undefined" ? window.location.href : "pulseshield.io#audit-seal",
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Audit request could not be sent.");
+      setAuditRequestStatus({ type: "success", message: "Manual audit request sent to PulseShield." });
+      setAuditRequestForm((current) => ({ ...current, project: "", contract: "", docs: "", message: "", website: "" }));
+    } catch (error) {
+      setAuditRequestStatus({ type: "error", message: error.message });
+    } finally {
+      setIsAuditRequestSending(false);
+    }
+  }
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -1633,7 +1683,7 @@ export default function Home() {
         <nav className="uhd-nav sticky top-3 z-30 mb-5 flex flex-col gap-3 rounded-xl px-3 py-3 md:flex-row md:items-center md:justify-between">
           <a href="#top" className="nav-brand group flex items-center gap-3">
             <span className="nav-mark grid h-11 w-11 place-items-center rounded-lg border border-[#00e7ff]/30 bg-black/55 text-[#00e7ff] shadow-[0_0_24px_rgba(0,231,255,.22)]">
-              <Network size={19} />
+              <img src="/assets/pulseshield-shield.png" alt="PulseShield shield" className="h-7 w-7 object-contain drop-shadow-[0_0_10px_rgba(0,231,255,.45)]" />
             </span>
             <span>
               <span className="nav-logo block text-sm font-black uppercase tracking-[0.2em] text-white">PulseShield<span>.io</span></span>
@@ -2268,6 +2318,137 @@ export default function Home() {
           </Panel>
         </div>
 
+        <Panel id="audit-seal" className="uhd-panel mt-4 overflow-hidden p-4">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="min-w-0">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-md border border-[#63ff9d]/30 bg-[#63ff9d]/10 text-[#b8ffd0] shadow-[0_0_24px_rgba(99,255,157,.16)]">
+                  <ShieldCheck size={21} />
+                </span>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-[#63ff9d]">Professional Manual Audit</div>
+                  <h2 className="text-2xl font-black text-white">Earn the PulseShield.io Seal</h2>
+                </div>
+              </div>
+              <p className="max-w-3xl text-sm leading-6 text-slate-300">
+                Automated scans are the first line of defense. Projects that need launch-grade confidence can request a
+                professional manual review by PulseShield.io and, when approved, display the PulseShield.io safety seal.
+              </p>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                {[
+                  ["Manual threat model", "Adversarial review of ownership, upgrade paths, liquidity controls, oracle design, and economic attack surface."],
+                  ["Evidence report", "Findings are classified by severity, confidence, exploitability, user impact, evidence, and remediation path."],
+                  ["Seal eligibility", "Approved projects may receive a PulseShield.io seal after fixes, verification, and final reviewer sign-off."],
+                ].map(([title, copy], index) => (
+                  <div key={title} className="rounded-md border border-white/10 bg-black/30 p-3">
+                    {index === 0 ? <Crosshair size={17} className="mb-2 text-[#ff4dce]" /> : index === 1 ? <FileSearch size={17} className="mb-2 text-[#00e7ff]" /> : <ShieldCheck size={17} className="mb-2 text-[#63ff9d]" />}
+                    <h3 className="font-bold text-white">{title}</h3>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">{copy}</p>
+                  </div>
+                ))}
+              </div>
+
+              <form onSubmit={submitAuditRequest} className="mt-5 grid gap-3 rounded-lg border border-[#63ff9d]/18 bg-black/30 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.055)]">
+                <input
+                  className="hidden"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={auditRequestForm.website}
+                  onChange={(event) => setAuditRequestForm({ ...auditRequestForm, website: event.target.value })}
+                  aria-hidden="true"
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="Project name">
+                    <input
+                      required
+                      value={auditRequestForm.project}
+                      onChange={(event) => setAuditRequestForm({ ...auditRequestForm, project: event.target.value })}
+                      placeholder="Protocol / token / app name"
+                      className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#63ff9d]"
+                    />
+                  </Field>
+                  <Field label="Reply email">
+                    <input
+                      required
+                      type="email"
+                      value={auditRequestForm.email}
+                      onChange={(event) => setAuditRequestForm({ ...auditRequestForm, email: event.target.value })}
+                      placeholder="team@example.com"
+                      className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#63ff9d]"
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="Contract address">
+                    <input
+                      value={auditRequestForm.contract}
+                      onChange={(event) => setAuditRequestForm({ ...auditRequestForm, contract: event.target.value })}
+                      placeholder="0x..."
+                      className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#00e7ff]"
+                    />
+                  </Field>
+                  <Field label="Docs / repo link">
+                    <input
+                      value={auditRequestForm.docs}
+                      onChange={(event) => setAuditRequestForm({ ...auditRequestForm, docs: event.target.value })}
+                      placeholder="https://"
+                      className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#00e7ff]"
+                    />
+                  </Field>
+                </div>
+                <Field label="Audit request notes">
+                  <textarea
+                    required
+                    minLength={12}
+                    rows={4}
+                    value={auditRequestForm.message}
+                    onChange={(event) => setAuditRequestForm({ ...auditRequestForm, message: event.target.value })}
+                    placeholder="Tell PulseShield what you need reviewed, launch timeline, protocol type, and any known risk areas."
+                    className="resize-none rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
+                  />
+                </Field>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-xs leading-5 text-slate-500">
+                    Seal approval is never automatic. Manual review, remediation, and final verification are required.
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={isAuditRequestSending}
+                    className="inline-flex items-center justify-center gap-2 rounded-md border border-[#63ff9d]/35 bg-[#63ff9d]/12 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-[#b8ffd0] shadow-[0_12px_28px_rgba(99,255,157,.12),inset_0_1px_0_rgba(255,255,255,.12)] transition hover:border-[#00e7ff]/45 hover:bg-[#00e7ff]/12 hover:text-[#9af7ff] active:translate-y-1 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <Send size={16} /> {isAuditRequestSending ? "Sending" : "Request audit"}
+                  </button>
+                </div>
+                {auditRequestStatus ? (
+                  <div className={`rounded-md border p-3 text-sm ${auditRequestStatus.type === "success" ? "border-[#63ff9d]/30 bg-[#63ff9d]/10 text-[#b8ffd0]" : "border-[#ffb347]/30 bg-[#ffb347]/10 text-[#ffe3ba]"}`}>
+                    {auditRequestStatus.message}
+                  </div>
+                ) : null}
+              </form>
+            </div>
+
+            <div className="relative min-w-0 rounded-lg border border-[#63ff9d]/18 bg-black/35 p-4">
+              <div className="absolute inset-0 rounded-lg bg-[radial-gradient(circle_at_50%_30%,rgba(99,255,157,.14),transparent_50%)]" />
+              <div className="relative">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-[#63ff9d]">Seal Preview</div>
+                <img
+                  src="/assets/pulseshield-seal.png"
+                  alt="PulseShield.io verified safety approved seal"
+                  className="mx-auto mt-4 w-full max-w-sm rounded-md object-contain drop-shadow-[0_24px_60px_rgba(99,255,157,.16)]"
+                />
+                <div className="mt-4 rounded-md border border-white/10 bg-white/[0.035] p-3">
+                  <h3 className="font-bold text-white">Approved by PulseShield.io</h3>
+                  <p className="mt-2 text-xs leading-5 text-slate-400">
+                    The seal is reserved for projects that complete manual review and satisfy PulseShield verification
+                    standards. It does not guarantee future safety or remove the need for continuous monitoring.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+
         <Panel id="feedback" className="uhd-panel mt-4 overflow-hidden p-4">
           <div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(320px,1fr)]">
             <div className="min-w-0">
@@ -2315,6 +2496,7 @@ export default function Home() {
                     <option>Bug report</option>
                     <option>Scan result feedback</option>
                     <option>UI feedback</option>
+                    <option>Manual audit request</option>
                     <option>Partnership</option>
                     <option>Other</option>
                   </select>
