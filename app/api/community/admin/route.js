@@ -1,6 +1,19 @@
-import { adminUpdate } from "../../../lib/communityStore";
+import { adminUpdate, getAdminDashboard } from "../../../lib/communityStore";
 
 export const runtime = "nodejs";
+
+export async function GET(request) {
+  const url = new URL(request.url);
+  const actorAddress = url.searchParams.get("actorAddress") || "";
+  const adminKey = url.searchParams.get("adminKey") || "";
+
+  try {
+    const dashboard = await getAdminDashboard({ actorAddress, adminKey });
+    return Response.json(dashboard);
+  } catch (error) {
+    return Response.json({ ok: false, error: error.message }, { status: 403 });
+  }
+}
 
 export async function POST(request) {
   let body;
@@ -12,9 +25,10 @@ export async function POST(request) {
 
   try {
     const result = await adminUpdate(body);
-    return Response.json(result);
+    const dashboard = await getAdminDashboard({ actorAddress: body.actorAddress, adminKey: body.adminKey }).catch(() => null);
+    return Response.json({ ...result, dashboard });
   } catch (error) {
-    const status = error.message === "Invalid admin key." ? 401 : 400;
+    const status = error.message.includes("access denied") ? 403 : 400;
     return Response.json({ ok: false, error: error.message }, { status });
   }
 }

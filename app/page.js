@@ -35,7 +35,9 @@ import {
   Skull,
   SlidersHorizontal,
   Terminal,
+  Trash2,
   TrendingUp,
+  UserCog,
   UserRound,
   Vote,
   Wallet,
@@ -623,25 +625,11 @@ function CommunityTrustPanel({
   selectedTrustVote,
   voteNote,
   walletAddress,
-  isAdminWallet,
   communityMessage,
   communityError,
-  adminOpen,
-  adminKey,
-  adminAddress,
-  adminReports,
-  adminAuditor,
-  adminSuspicious,
   onVoteChange,
   onNoteChange,
   onCastVote,
-  onAdminOpen,
-  onAdminKeyChange,
-  onAdminAddressChange,
-  onAdminReportsChange,
-  onAdminAuditorChange,
-  onAdminSuspiciousChange,
-  onAdminSubmit,
 }) {
   const totals = trustSnapshot?.aggregate?.totals?.length ? trustSnapshot.aggregate.totals : defaultTrustTotals;
   const leader = trustSnapshot?.aggregate?.leader;
@@ -723,68 +711,270 @@ function CommunityTrustPanel({
 
       {communityMessage ? <div className="mt-3 rounded-md border border-[#63ff9d]/30 bg-[#63ff9d]/10 p-3 text-sm text-[#b8ffd0]">{communityMessage}</div> : null}
       {communityError ? <div className="mt-3 rounded-md border border-[#ffb347]/30 bg-[#ffb347]/10 p-3 text-sm text-[#ffe3ba]">{communityError}</div> : null}
-
-      {isAdminWallet ? (
-        <button
-          onClick={onAdminOpen}
-          className="mt-4 flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400 transition hover:border-[#ff4dce]/35 hover:text-[#ffc2f6]"
-          type="button"
-        >
-          <span className="flex items-center gap-2"><Crown size={14} /> Admin trust controls</span>
-          <ChevronDown size={15} className={`transition-transform ${adminOpen ? "rotate-180" : ""}`} />
-        </button>
-      ) : null}
-
-      {isAdminWallet && adminOpen ? (
-        <div className="mt-3 grid gap-3 rounded-lg border border-[#ff4dce]/20 bg-[#ff4dce]/5 p-3">
-          <Field label="Admin key">
-            <input
-              type="password"
-              value={adminKey}
-              onChange={(event) => onAdminKeyChange(event.target.value)}
-              placeholder="Private server admin key"
-              className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
-            />
-          </Field>
-          <Field label="Wallet to update">
-            <input
-              value={adminAddress}
-              onChange={(event) => onAdminAddressChange(event.target.value)}
-              placeholder="0x..."
-              className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
-            />
-          </Field>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Field label="Accurate reports">
-              <input
-                type="number"
-                min="0"
-                max="25"
-                value={adminReports}
-                onChange={(event) => onAdminReportsChange(event.target.value)}
-                className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
-              />
-            </Field>
-            <label className="flex items-center gap-2 rounded-md border border-white/10 bg-black/35 px-3 py-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-300">
-              <input type="checkbox" checked={adminAuditor} onChange={(event) => onAdminAuditorChange(event.target.checked)} />
-              Auditor
-            </label>
-            <label className="flex items-center gap-2 rounded-md border border-white/10 bg-black/35 px-3 py-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-300">
-              <input type="checkbox" checked={adminSuspicious} onChange={(event) => onAdminSuspiciousChange(event.target.checked)} />
-              Suspicious
-            </label>
-          </div>
-          <button
-            onClick={onAdminSubmit}
-            className="rounded-md border border-[#ff4dce]/30 bg-[#ff4dce]/10 px-3 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#ffc2f6] transition hover:border-[#00e7ff]/45"
-            type="button"
-          >
-            Update trust profile
-          </button>
-        </div>
-      ) : null}
     </Panel>
   );
+}
+
+function AdminDashboard({
+  dashboard,
+  error,
+  message,
+  walletAddress,
+  adminKey,
+  adminAddress,
+  adminReports,
+  adminRole,
+  adminAuditor,
+  adminSuspicious,
+  moderationReason,
+  onRefresh,
+  onAdminKeyChange,
+  onAdminAddressChange,
+  onAdminReportsChange,
+  onAdminRoleChange,
+  onAdminAuditorChange,
+  onAdminSuspiciousChange,
+  onModerationReasonChange,
+  onProfileUpdate,
+  onModerateVote,
+}) {
+  const permissions = dashboard?.permissions || {};
+  const stats = dashboard?.stats || {};
+  const users = dashboard?.users || [];
+  const votes = dashboard?.votes || [];
+  const auditLog = dashboard?.auditLog || [];
+
+  return (
+    <Panel id="admin" className="uhd-panel mt-4 p-4">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-[#ff6bff]">Restricted Operations</div>
+          <h2 className="mt-1 flex items-center gap-2 text-2xl font-black text-white">
+            <Crown size={20} className="text-[#ffb347]" />
+            Admin Dashboard
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+            Wallet-gated moderation, role delegation, vote-note controls, and community trust operations for PulseShield.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-md border border-[#ffb347]/25 bg-[#ffb347]/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#ffe3ba]">
+            {permissions.role || "admin"} access
+          </span>
+          <button
+            onClick={onRefresh}
+            className="rounded-md border border-[#00e7ff]/25 bg-[#00e7ff]/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#9af7ff] transition hover:border-[#ff4dce]/40"
+            type="button"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Users", stats.users || 0],
+          ["Votes", stats.votes || 0],
+          ["Vote notes", stats.notes || 0],
+          ["Hidden notes", stats.hiddenNotes || 0],
+          ["Admins", stats.admins || 0],
+          ["Moderators", stats.moderators || 0],
+          ["Targets", stats.targets || 0],
+          ["Flagged users", stats.suspicious || 0],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-md border border-white/10 bg-black/30 p-3">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500">{label}</div>
+            <div className="mt-1 text-2xl font-black text-white">{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-4 2xl:grid-cols-[410px_minmax(0,1fr)]">
+        <div className="grid gap-4">
+          <div className="rounded-lg border border-[#ff4dce]/20 bg-[#ff4dce]/5 p-3">
+            <h3 className="mb-3 flex items-center gap-2 font-bold text-[#ffc2f6]">
+              <UserCog size={17} /> User Management
+            </h3>
+            <div className="grid gap-3">
+              <Field label="Server admin key optional">
+                <input
+                  type="password"
+                  value={adminKey}
+                  onChange={(event) => onAdminKeyChange(event.target.value)}
+                  placeholder="Only needed for server-key fallback"
+                  className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
+                />
+              </Field>
+              <Field label="Wallet address">
+                <input
+                  value={adminAddress}
+                  onChange={(event) => onAdminAddressChange(event.target.value)}
+                  placeholder="0x..."
+                  className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
+                />
+              </Field>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Field label="Role">
+                  <select
+                    value={adminRole}
+                    onChange={(event) => onAdminRoleChange(event.target.value)}
+                    disabled={!permissions.canGrantAccess}
+                    className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-[#ff4dce] disabled:opacity-50"
+                  >
+                    <option value="user">User</option>
+                    <option value="moderator">Moderator</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </Field>
+                <Field label="Accurate reports">
+                  <input
+                    type="number"
+                    min="0"
+                    max="25"
+                    value={adminReports}
+                    onChange={(event) => onAdminReportsChange(event.target.value)}
+                    className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="flex items-center gap-2 rounded-md border border-white/10 bg-black/35 px-3 py-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-300">
+                  <input type="checkbox" checked={adminAuditor} onChange={(event) => onAdminAuditorChange(event.target.checked)} />
+                  Auditor badge
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-white/10 bg-black/35 px-3 py-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-300">
+                  <input type="checkbox" checked={adminSuspicious} onChange={(event) => onAdminSuspiciousChange(event.target.checked)} />
+                  Suspicious penalty
+                </label>
+              </div>
+              <button
+                onClick={onProfileUpdate}
+                disabled={!permissions.canManageUsers}
+                className="rounded-md border border-[#ff4dce]/30 bg-[#ff4dce]/10 px-3 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#ffc2f6] transition hover:border-[#00e7ff]/45 disabled:cursor-not-allowed disabled:opacity-45"
+                type="button"
+              >
+                Update user / permissions
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+            <h3 className="mb-3 flex items-center gap-2 font-bold text-[#9af7ff]">
+              <Activity size={17} /> Audit Trail
+            </h3>
+            <div className="grid max-h-72 gap-2 overflow-auto pr-1">
+              {auditLog.length ? auditLog.map((item, index) => (
+                <div key={`${item.updatedAt}-${index}`} className="rounded-md border border-white/10 bg-white/[0.025] p-2 text-xs text-slate-400">
+                  <div className="font-bold text-slate-200">{item.action}</div>
+                  <div className="mt-1 break-all font-mono">{item.address || item.target || "system"}</div>
+                  <div className="mt-1">{item.updatedAt}</div>
+                </div>
+              )) : <div className="text-sm text-slate-500">No admin actions recorded yet.</div>}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          <div className="rounded-lg border border-[#00e7ff]/18 bg-black/30 p-3">
+            <h3 className="mb-3 flex items-center gap-2 font-bold text-[#9af7ff]">
+              <MessageSquare size={17} /> Voting Comments Moderation
+            </h3>
+            <Field label="Moderation reason">
+              <input
+                value={moderationReason}
+                onChange={(event) => onModerationReasonChange(event.target.value)}
+                placeholder="Spam, abuse, duplicate, doxxing, off-topic..."
+                className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#00e7ff]"
+              />
+            </Field>
+            <div className="mt-3 grid max-h-[520px] gap-2 overflow-auto pr-1">
+              {votes.length ? votes.map((vote) => (
+                <div key={`${vote.target}-${vote.address}`} className="rounded-md border border-white/10 bg-white/[0.025] p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-sm font-black text-white">{vote.vote}</div>
+                      <div className="mt-1 truncate font-mono text-[11px] text-slate-500" title={vote.target}>{vote.target}</div>
+                    </div>
+                    <span className={`rounded border px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${vote.moderated ? "border-[#ffb347]/35 bg-[#ffb347]/10 text-[#ffe3ba]" : "border-[#63ff9d]/25 bg-[#63ff9d]/10 text-[#b8ffd0]"}`}>
+                      {vote.moderated ? "hidden" : "visible"}
+                    </span>
+                  </div>
+                  <div className="mt-2 break-all font-mono text-xs text-slate-400">
+                    {vote.displayName || shortAddress(vote.address)} / {vote.address}
+                  </div>
+                  <p className="mt-2 text-sm leading-5 text-slate-300">
+                    {vote.note || (vote.moderated ? "Comment hidden by moderation." : "No comment attached.")}
+                  </p>
+                  {vote.moderationReason ? <div className="mt-2 text-xs text-[#ffe3ba]">Reason: {vote.moderationReason}</div> : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => onModerateVote("vote.moderate", vote)}
+                      disabled={!permissions.canModerate || vote.moderated}
+                      className="rounded border border-[#ffb347]/30 bg-[#ffb347]/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#ffe3ba] disabled:opacity-40"
+                      type="button"
+                    >
+                      Hide comment
+                    </button>
+                    <button
+                      onClick={() => onModerateVote("vote.restore", vote)}
+                      disabled={!permissions.canModerate || !vote.moderated}
+                      className="rounded border border-[#63ff9d]/30 bg-[#63ff9d]/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#b8ffd0] disabled:opacity-40"
+                      type="button"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      onClick={() => onModerateVote("vote.delete", vote)}
+                      disabled={!permissions.canModerate}
+                      className="rounded border border-[#ff4dce]/30 bg-[#ff4dce]/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#ffc2f6] disabled:opacity-40"
+                      type="button"
+                    >
+                      <Trash2 size={12} className="inline" /> Remove vote
+                    </button>
+                  </div>
+                </div>
+              )) : <div className="text-sm text-slate-500">No community vote comments yet.</div>}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+            <h3 className="mb-3 flex items-center gap-2 font-bold text-white">
+              <UsersIcon /> User Directory
+            </h3>
+            <div className="grid max-h-80 gap-2 overflow-auto pr-1">
+              {users.map((user) => (
+                <button
+                  key={user.address}
+                  onClick={() => {
+                    onAdminAddressChange(user.address);
+                    onAdminRoleChange(user.role === "root" ? "admin" : user.role || "user");
+                    onAdminReportsChange(String(user.accurateReports || 0));
+                    onAdminAuditorChange(Boolean(user.auditorBadge));
+                    onAdminSuspiciousChange(Boolean(user.suspicious));
+                  }}
+                  className="rounded-md border border-white/10 bg-white/[0.025] p-2 text-left transition hover:border-[#00e7ff]/35"
+                  type="button"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-bold text-white">{user.displayName || shortAddress(user.address)}</span>
+                    <span className="rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-400">{user.role}</span>
+                  </div>
+                  <div className="mt-1 truncate font-mono text-[11px] text-slate-500">{user.address}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {error ? <div className="mt-4 rounded-md border border-[#ffb347]/30 bg-[#ffb347]/10 p-3 text-sm text-[#ffe3ba]">{error}</div> : null}
+      {message ? <div className="mt-4 rounded-md border border-[#63ff9d]/30 bg-[#63ff9d]/10 p-3 text-sm text-[#b8ffd0]">{message}</div> : null}
+    </Panel>
+  );
+}
+
+function UsersIcon() {
+  return <UserCog size={17} className="text-[#ffb347]" />;
 }
 
 function ScoreRing({ score, level }) {
@@ -1054,12 +1244,16 @@ export default function Home() {
   const [voteNote, setVoteNote] = useState("");
   const [communityMessage, setCommunityMessage] = useState("");
   const [communityError, setCommunityError] = useState("");
-  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminDashboard, setAdminDashboard] = useState(null);
+  const [adminDashboardError, setAdminDashboardError] = useState("");
+  const [adminDashboardMessage, setAdminDashboardMessage] = useState("");
   const [adminKey, setAdminKey] = useState("");
   const [adminAddress, setAdminAddress] = useState("");
   const [adminReports, setAdminReports] = useState("0");
+  const [adminRole, setAdminRole] = useState("user");
   const [adminAuditor, setAdminAuditor] = useState(false);
   const [adminSuspicious, setAdminSuspicious] = useState(false);
+  const [adminModerationReason, setAdminModerationReason] = useState("");
   const [form, setForm] = useState({
     address: sampleAddress,
     owner: "",
@@ -1093,7 +1287,11 @@ export default function Home() {
   const displayedRiskLabels = scanReport?.riskLabels?.length ? scanReport.riskLabels : fallbackRiskLabels;
   const trustTarget = scanReport?.meta?.address || form.address;
   const isAdminWallet = walletAddress.toLowerCase() === adminWalletAddress;
+  const canViewAdminDashboard = isAdminWallet || Boolean(trustSnapshot?.permissions?.canViewAdmin || walletProfile?.role === "admin" || walletProfile?.role === "moderator" || walletProfile?.role === "root");
   const isPulseChain = Boolean(isConnected && normalizeClientAddress(connectedAddress) && walletAddress && chainId === 369);
+  const displayedNavItems = canViewAdminDashboard
+    ? navItems.flatMap((item) => item[0] === "Feedback" ? [["Admin", "#admin"], item] : [item])
+    : navItems;
   const terminalLines = scanReport?.terminal ?? [
     "engine.boot: PulseShield online",
     `chain.profile: ${chainProfile.rpc} / native gas ${chainProfile.native}`,
@@ -1253,29 +1451,74 @@ export default function Home() {
     }
   }
 
+  async function fetchAdminDashboard() {
+    if (!walletAddress && !adminKey) return;
+    setAdminDashboardError("");
+    const params = new URLSearchParams({ actorAddress: walletAddress });
+    if (adminKey) params.set("adminKey", adminKey);
+    try {
+      const response = await fetch(`/api/community/admin?${params.toString()}`);
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Admin dashboard unavailable.");
+      setAdminDashboard(payload);
+    } catch (error) {
+      setAdminDashboardError(error.message);
+    }
+  }
+
   async function submitAdminUpdate() {
-    setCommunityError("");
-    setCommunityMessage("");
+    setAdminDashboardError("");
+    setAdminDashboardMessage("");
     try {
       const response = await fetch("/api/community/admin", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          action: "profile.update",
+          actorAddress: walletAddress,
           adminKey,
           address: adminAddress,
           auditorBadge: adminAuditor,
           accurateReports: adminReports,
           suspicious: adminSuspicious,
           status: adminSuspicious ? "suspicious" : "active",
+          role: adminRole,
         }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Admin update failed.");
       if (payload.profile?.address === walletAddress) setWalletProfile(payload.profile);
+      if (payload.dashboard) setAdminDashboard(payload.dashboard);
       await fetchTrustSnapshot(trustTarget, walletAddress);
-      setCommunityMessage("Admin trust profile updated.");
+      setAdminDashboardMessage("User profile and permissions updated.");
     } catch (error) {
-      setCommunityError(error.message);
+      setAdminDashboardError(error.message);
+    }
+  }
+
+  async function moderateVote(action, vote) {
+    setAdminDashboardError("");
+    setAdminDashboardMessage("");
+    try {
+      const response = await fetch("/api/community/admin", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action,
+          actorAddress: walletAddress,
+          adminKey,
+          target: vote.target,
+          voteAddress: vote.address,
+          reason: adminModerationReason,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Moderation action failed.");
+      if (payload.dashboard) setAdminDashboard(payload.dashboard);
+      await fetchTrustSnapshot(trustTarget, walletAddress);
+      setAdminDashboardMessage(action === "vote.delete" ? "Vote removed." : action === "vote.restore" ? "Vote comment restored." : "Vote comment hidden.");
+    } catch (error) {
+      setAdminDashboardError(error.message);
     }
   }
 
@@ -1371,8 +1614,13 @@ export default function Home() {
   }, [trustTarget, walletAddress]);
 
   useEffect(() => {
-    if (!isAdminWallet && adminOpen) setAdminOpen(false);
-  }, [isAdminWallet, adminOpen]);
+    if (canViewAdminDashboard) {
+      fetchAdminDashboard().catch(() => null);
+    } else {
+      setAdminDashboard(null);
+      setAdminDashboardError("");
+    }
+  }, [canViewAdminDashboard, walletAddress]);
 
   return (
     <main className="relative min-h-screen overflow-hidden px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
@@ -1393,7 +1641,7 @@ export default function Home() {
             </span>
           </a>
           <div className="nav-links flex flex-wrap gap-2">
-            {navItems.map(([label, href]) => (
+            {displayedNavItems.map(([label, href]) => (
               <a key={label} href={href} className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-300 transition hover:border-[#00e7ff]/50 hover:bg-[#00e7ff]/10 hover:text-[#00e7ff]">
                 {label}
               </a>
@@ -1949,28 +2197,40 @@ export default function Home() {
               selectedTrustVote={selectedTrustVote}
               voteNote={voteNote}
               walletAddress={walletAddress}
-              isAdminWallet={isAdminWallet}
               communityMessage={communityMessage}
               communityError={communityError}
-              adminOpen={adminOpen}
-              adminKey={adminKey}
-              adminAddress={adminAddress}
-              adminReports={adminReports}
-              adminAuditor={adminAuditor}
-              adminSuspicious={adminSuspicious}
               onVoteChange={setSelectedTrustVote}
               onNoteChange={setVoteNote}
               onCastVote={castTrustVote}
-              onAdminOpen={() => setAdminOpen(!adminOpen)}
-              onAdminKeyChange={setAdminKey}
-              onAdminAddressChange={setAdminAddress}
-              onAdminReportsChange={setAdminReports}
-              onAdminAuditorChange={setAdminAuditor}
-              onAdminSuspiciousChange={setAdminSuspicious}
-              onAdminSubmit={submitAdminUpdate}
             />
           </div>
         </div>
+
+        {canViewAdminDashboard ? (
+          <AdminDashboard
+            dashboard={adminDashboard}
+            error={adminDashboardError}
+            message={adminDashboardMessage}
+            walletAddress={walletAddress}
+            adminKey={adminKey}
+            adminAddress={adminAddress}
+            adminReports={adminReports}
+            adminRole={adminRole}
+            adminAuditor={adminAuditor}
+            adminSuspicious={adminSuspicious}
+            moderationReason={adminModerationReason}
+            onRefresh={fetchAdminDashboard}
+            onAdminKeyChange={setAdminKey}
+            onAdminAddressChange={setAdminAddress}
+            onAdminReportsChange={setAdminReports}
+            onAdminRoleChange={setAdminRole}
+            onAdminAuditorChange={setAdminAuditor}
+            onAdminSuspiciousChange={setAdminSuspicious}
+            onModerationReasonChange={setAdminModerationReason}
+            onProfileUpdate={submitAdminUpdate}
+            onModerateVote={moderateVote}
+          />
+        ) : null}
 
         <div id="modules" className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
           <Panel className="uhd-panel p-4">
@@ -2158,7 +2418,7 @@ export default function Home() {
                 <Info size={16} /> Site Navigation
               </h3>
               <div className="grid grid-cols-2 gap-2">
-                {navItems.map(([label, href]) => (
+                {displayedNavItems.map(([label, href]) => (
                   <a key={label} href={href} className="rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-sm text-slate-300 transition hover:border-[#00e7ff]/45 hover:text-[#00e7ff]">
                     {label}
                   </a>

@@ -11,6 +11,7 @@ const voteTypes = {
 
 const dataDir = process.env.PULSESHIELD_DATA_DIR || path.join(process.cwd(), ".data");
 const dataFile = path.join(dataDir, "community-trust.json");
+const rootAdminAddress = normalizeAddress(process.env.PULSESHIELD_ROOT_ADMIN || "0x85E6cC88F3055b589eb1d4030863be2CFcc0763E");
 
 const defaultStore = {
   version: 1,
@@ -92,10 +93,12 @@ export function voteOptions() {
 
 export function publicProfile(profile) {
   if (!profile) return null;
+  const address = normalizeAddress(profile.address);
   return {
-    address: profile.address,
+    address,
     displayName: profile.displayName || "",
-    status: profile.status || "active",
+    status: address === rootAdminAddress ? "root" : profile.status || "active",
+    role: address === rootAdminAddress ? "root" : profile.role || "user",
     auditorBadge: Boolean(profile.auditorBadge),
     accurateReports: Number(profile.accurateReports || 0),
     suspicious: Boolean(profile.suspicious),
@@ -153,7 +156,8 @@ function aggregateVotes(store, target) {
       .slice(0, 8)
       .map((vote) => ({
         vote: vote.vote,
-        note: vote.note,
+        note: vote.moderated?.hidden ? "" : vote.note,
+        moderated: Boolean(vote.moderated?.hidden),
         address: vote.address,
         displayName: store.profiles[vote.address]?.displayName || "",
         weight: credibilityWeight(store.profiles[vote.address]),
@@ -165,11 +169,13 @@ function aggregateVotes(store, target) {
 export async function getCommunitySnapshot(target, address) {
   const store = await ensureStore();
   const normalized = normalizeAddress(address);
+  const profile = store.profiles[normalized];
   return {
     ok: true,
     voteOptions: voteOptions(),
     aggregate: aggregateVotes(store, target),
-    profile: publicProfile(store.profiles[normalized]),
+    profile: publicProfile(profile),
+    permissions: adminPermissions(store, normalized),
     userVote: normalized ? store.votes[targetKey(target)]?.[normalized] || null : null,
   };
 }
@@ -206,6 +212,70 @@ export async function upsertProfile({ address, displayName, walletActivity }) {
     store.profiles[normalized] = existing;
     return { ok: true, profile: publicProfile(existing) };
   });
+}
+
+function adminPermissions(store, actorAddress) {
+  const normalized = normalizeAddress(actorAddress);
+  const role = normalized === rootAdminAddress ? "root" : store.profiles[normalized]?.role || "user";
+  return {
+    role,
+    canViewAdmin: ["root", "admin", "moderator"].includes(role),
+    canModerate: ["root", "admin", "moderator"].includes(role),
+    canManageUsers: ["root", "admin"].includes(role),
+    canGrantAccess: ["root", "admin"].includes(role),
+  };
+}
+
+function assertAdminAccess(store, actorAddress, adminKey, permission = "canViewAdmin") {
+  if (process.env.PULSESHIELD_ADMIN_KEY && adminKey === process.env.PULSESHIELD_ADMIN_KEY) {
+    return { role: "server-key", canViewAdmin: true, canModerate: true, canManageUsers: true, canGrantAccess: true };
+  }
+  const permissions = adminPermissions(store, actorAddress);
+  if (!permissions[permission]) throw new Error("Admin dashboard access denied.");
+  return permissions;
+}
+
+function flattenVotes(store) {
+  return Object.entries(store.votes || {}).flatMap(([target, votesByAddress]) => (
+    Object.values(votesByAddress || {}).map((vote) => ({
+      target,
+      address: vote.address,
+      displayName: store.profiles[vote.address]?.displayName || "",
+      vote: vote.vote,
+      note: vote.note || "",
+      moderated: Boolean(vote.moderated?.hidden),
+      moderationReason: vote.moderated?.reason || "",
+      updatedAt: vote.updatedAt,
+    }))
+  ));
+}
+
+export async function getAdminDashboard({ actorAddress, adminKey }) {
+  const store = await ensureStore();
+  const permissions = assertAdminAccess(store, actorAddress, adminKey);
+  const profiles = Object.values(store.profiles || {}).map(publicProfile);
+  const votes = flattenVotes(store).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  const targets = Object.keys(store.votes || {});
+
+  return {
+    ok: true,
+    permissions,
+    stats: {
+      users: profiles.length,
+      targets: targets.length,
+      votes: votes.length,
+      notes: votes.filter((vote) => vote.note).length,
+      hiddenNotes: votes.filter((vote) => vote.moderated).length,
+      admins: profiles.filter((profile) => ["root", "admin"].includes(profile.role)).length,
+      moderators: profiles.filter((profile) => profile.role === "moderator").length,
+      suspicious: profiles.filter((profile) => profile.suspicious).length,
+    },
+    users: profiles
+      .sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)))
+      .slice(0, 120),
+    votes: votes.slice(0, 160),
+    auditLog: (store.auditLog || []).slice(-80).reverse(),
+  };
 }
 
 export async function castCommunityVote({ address, target, vote, note }) {
@@ -246,14 +316,43 @@ export async function castCommunityVote({ address, target, vote, note }) {
   });
 }
 
-export async function adminUpdate({ adminKey, address, auditorBadge, accurateReports, suspicious, status }) {
-  if (!process.env.PULSESHIELD_ADMIN_KEY || adminKey !== process.env.PULSESHIELD_ADMIN_KEY) {
-    throw new Error("Invalid admin key.");
-  }
+export async function adminUpdate({
+  actorAddress,
+  adminKey,
+  action = "profile.update",
+  address,
+  auditorBadge,
+  accurateReports,
+  suspicious,
+  status,
+  role,
+  target,
+  voteAddress,
+  reason,
+}) {
   const normalized = normalizeAddress(address);
-  if (!normalized) throw new Error("Enter a valid wallet address.");
 
   return mutateStore((store) => {
+    const permission = action === "vote.moderate" || action === "vote.restore" || action === "vote.delete" ? "canModerate" : "canManageUsers";
+    const permissions = assertAdminAccess(store, actorAddress, adminKey, permission);
+
+    if (action === "vote.moderate" || action === "vote.restore" || action === "vote.delete") {
+      const key = targetKey(target);
+      const voter = normalizeAddress(voteAddress);
+      if (!key || !voter || !store.votes[key]?.[voter]) throw new Error("Vote note was not found.");
+      if (action === "vote.delete") {
+        delete store.votes[key][voter];
+      } else {
+        store.votes[key][voter].moderated = action === "vote.moderate"
+          ? { hidden: true, reason: clean(reason, 220), by: normalizeAddress(actorAddress), updatedAt: now() }
+          : { hidden: false, reason: "", by: normalizeAddress(actorAddress), updatedAt: now() };
+      }
+      store.auditLog.push({ action, target: key, address: voter, by: normalizeAddress(actorAddress), updatedAt: now() });
+      store.auditLog = store.auditLog.slice(-200);
+      return { ok: true, permissions, dashboard: null };
+    }
+
+    if (!normalized) throw new Error("Enter a valid wallet address.");
     const profile = store.profiles[normalized] || {
       address: normalized,
       createdAt: now(),
@@ -264,11 +363,16 @@ export async function adminUpdate({ adminKey, address, auditorBadge, accurateRep
     if (accurateReports !== undefined) profile.accurateReports = Math.max(0, Math.min(25, Number(accurateReports || 0)));
     if (suspicious !== undefined) profile.suspicious = Boolean(suspicious);
     if (status) profile.status = clean(status, 24);
+    if (role !== undefined) {
+      if (!["user", "moderator", "admin"].includes(role)) throw new Error("Unsupported role.");
+      if (normalized === rootAdminAddress) throw new Error("Root admin role cannot be changed.");
+      profile.role = role;
+    }
     profile.updatedAt = now();
     store.profiles[normalized] = profile;
-    store.auditLog.push({ action: "admin.profile.update", address: normalized, updatedAt: now() });
+    store.auditLog.push({ action, address: normalized, role: profile.role || "user", by: normalizeAddress(actorAddress), updatedAt: now() });
     store.auditLog = store.auditLog.slice(-200);
 
-    return { ok: true, profile: publicProfile(profile) };
+    return { ok: true, permissions, profile: publicProfile(profile) };
   });
 }
