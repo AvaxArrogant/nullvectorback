@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount, useChainId, useDisconnect, usePublicClient, useSwitchChain } from "wagmi";
 import ReactFlow, { Background, Controls } from "reactflow";
 import {
   AlertTriangle,
@@ -513,7 +515,8 @@ function WalletIdentityPanel({
   walletMessage,
   displayNameDraft,
   isWalletBusy,
-  onConnect,
+  isPulseChain,
+  onSwitchPulseChain,
   onDisconnect,
   onNameChange,
   onSaveName,
@@ -539,17 +542,34 @@ function WalletIdentityPanel({
           {connected ? displayIdentity(walletAddress, walletProfile) : "No wallet connected"}
         </div>
         {connected ? <div className="mt-1 break-all font-mono text-[11px] text-slate-500">{walletAddress}</div> : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            onClick={connected ? onDisconnect : onConnect}
-            disabled={isWalletBusy}
-            className="rounded-md border border-[#00e7ff]/30 bg-[#00e7ff]/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#9af7ff] transition hover:border-[#ff4dce]/45 hover:bg-[#ff4dce]/10 disabled:opacity-50"
-            type="button"
-          >
-            {isWalletBusy ? "Syncing" : connected ? "Disconnect" : "Connect Wallet"}
-          </button>
+        <div className="rainbow-connect-zone mt-3 flex flex-wrap gap-2">
+          <ConnectButton
+            accountStatus={{ smallScreen: "avatar", largeScreen: "address" }}
+            chainStatus={{ smallScreen: "icon", largeScreen: "full" }}
+            showBalance={false}
+          />
+          {connected ? (
+            <button
+              onClick={onDisconnect}
+              disabled={isWalletBusy}
+              className="rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-slate-300 transition hover:border-[#ff4dce]/35 hover:text-[#ffc2f6] disabled:opacity-50"
+              type="button"
+            >
+              Disconnect
+            </button>
+          ) : null}
+          {connected && !isPulseChain ? (
+            <button
+              onClick={onSwitchPulseChain}
+              disabled={isWalletBusy}
+              className="rounded-md border border-[#ffb347]/35 bg-[#ffb347]/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#ffe3ba] transition hover:border-[#00e7ff]/45 disabled:opacity-50"
+              type="button"
+            >
+              PulseChain
+            </button>
+          ) : null}
           <span className="rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs text-slate-400">
-            PulseChain community login
+            {connected && isPulseChain ? "RainbowKit PulseChain login" : "PulseChain community login"}
           </span>
         </div>
       </div>
@@ -1004,6 +1024,11 @@ function TokenResultHeader({ scanReport, marketReport, onExpandMarket }) {
 }
 
 export default function Home() {
+  const { address: connectedAddress, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { disconnect: disconnectRainbowKit } = useDisconnect();
+  const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient({ chainId: 369 });
   const [advanced, setAdvanced] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [scanReport, setScanReport] = useState(null);
@@ -1068,6 +1093,7 @@ export default function Home() {
   const displayedRiskLabels = scanReport?.riskLabels?.length ? scanReport.riskLabels : fallbackRiskLabels;
   const trustTarget = scanReport?.meta?.address || form.address;
   const isAdminWallet = walletAddress.toLowerCase() === adminWalletAddress;
+  const isPulseChain = Boolean(isConnected && normalizeClientAddress(connectedAddress) && walletAddress && chainId === 369);
   const terminalLines = scanReport?.terminal ?? [
     "engine.boot: PulseShield online",
     `chain.profile: ${chainProfile.rpc} / native gas ${chainProfile.native}`,
@@ -1138,58 +1164,45 @@ export default function Home() {
 
   async function estimateWalletActivity(address) {
     try {
-      const count = await window.ethereum.request({ method: "eth_getTransactionCount", params: [address, "latest"] });
-      return Number.parseInt(count, 16) > 0 ? "active" : "new";
+      const count = await publicClient?.getTransactionCount({ address });
+      return Number(count || 0) > 0 ? "active" : "new";
     } catch {
       return "new";
     }
   }
 
-  async function connectWallet() {
-    setIsWalletBusy(true);
+  async function syncConnectedWallet(address) {
+    const normalized = normalizeClientAddress(address);
+    if (!normalized) return;
     setWalletError("");
     setWalletMessage("");
     try {
-      if (!window.ethereum) throw new Error("No browser wallet detected. Install a Web3 wallet, then reconnect.");
-      try {
-        await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x171" }] });
-      } catch (switchError) {
-        if (switchError?.code === 4902) {
-          await window.ethereum.request({
-            method: "wallet_addEthereumChain",
-            params: [{
-              chainId: "0x171",
-              chainName: "PulseChain",
-              nativeCurrency: { name: "Pulse", symbol: "PLS", decimals: 18 },
-              rpcUrls: ["https://rpc.pulsechain.com"],
-              blockExplorerUrls: ["https://scan.pulsechain.com"],
-            }],
-          });
-        }
-      }
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const address = normalizeClientAddress(accounts?.[0]);
-      if (!address) throw new Error("Wallet did not return a valid address.");
-      const walletActivity = await estimateWalletActivity(address);
-      localStorage.setItem("pulseshield.wallet", address);
-      setWalletAddress(address);
-      setAdminAddress(address);
-      await saveWalletProfile(address, undefined, walletActivity);
-      await fetchTrustSnapshot(trustTarget, address);
+      const walletActivity = await estimateWalletActivity(normalized);
+      setWalletAddress(normalized);
+      setAdminAddress(normalized);
+      await saveWalletProfile(normalized, undefined, walletActivity);
+      await fetchTrustSnapshot(trustTarget, normalized);
       setWalletMessage("Wallet connected to PulseShield trust identity.");
     } catch (error) {
       setWalletError(error.message);
-    } finally {
-      setIsWalletBusy(false);
     }
   }
 
   function disconnectWallet() {
-    localStorage.removeItem("pulseshield.wallet");
+    disconnectRainbowKit();
     setWalletAddress("");
     setWalletProfile(null);
     setDisplayNameDraft("");
     setWalletMessage("Wallet disconnected from this browser session.");
+  }
+
+  function switchToPulseChain() {
+    setWalletError("");
+    try {
+      switchChain({ chainId: 369 });
+    } catch (error) {
+      setWalletError(error.message || "Open your wallet and switch to PulseChain.");
+    }
   }
 
   async function saveDisplayName() {
@@ -1338,12 +1351,20 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    const savedWallet = normalizeClientAddress(localStorage.getItem("pulseshield.wallet"));
-    if (savedWallet) {
-      setWalletAddress(savedWallet);
-      setAdminAddress(savedWallet);
-    }
   }, []);
+
+  useEffect(() => {
+    const normalized = normalizeClientAddress(connectedAddress);
+    if (isConnected && normalized && normalized !== walletAddress) {
+      setIsWalletBusy(true);
+      syncConnectedWallet(normalized).finally(() => setIsWalletBusy(false));
+    }
+    if (!isConnected && walletAddress) {
+      setWalletAddress("");
+      setWalletProfile(null);
+      setDisplayNameDraft("");
+    }
+  }, [connectedAddress, isConnected]);
 
   useEffect(() => {
     fetchTrustSnapshot(trustTarget, walletAddress).catch(() => null);
@@ -1352,23 +1373,6 @@ export default function Home() {
   useEffect(() => {
     if (!isAdminWallet && adminOpen) setAdminOpen(false);
   }, [isAdminWallet, adminOpen]);
-
-  useEffect(() => {
-    if (!window.ethereum?.on) return undefined;
-    function onAccountsChanged(accounts) {
-      const address = normalizeClientAddress(accounts?.[0]);
-      if (address) {
-        localStorage.setItem("pulseshield.wallet", address);
-        setWalletAddress(address);
-        setAdminAddress(address);
-        saveWalletProfile(address, undefined, "active").catch(() => null);
-      } else {
-        disconnectWallet();
-      }
-    }
-    window.ethereum.on("accountsChanged", onAccountsChanged);
-    return () => window.ethereum?.removeListener?.("accountsChanged", onAccountsChanged);
-  }, []);
 
   return (
     <main className="relative min-h-screen overflow-hidden px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
@@ -1932,7 +1936,8 @@ export default function Home() {
               walletMessage={walletMessage}
               displayNameDraft={displayNameDraft}
               isWalletBusy={isWalletBusy}
-              onConnect={connectWallet}
+              isPulseChain={isPulseChain}
+              onSwitchPulseChain={switchToPulseChain}
               onDisconnect={disconnectWallet}
               onNameChange={setDisplayNameDraft}
               onSaveName={saveDisplayName}

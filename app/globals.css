@@ -53,6 +53,18 @@ textarea {
   min-width: 0;
 }
 
+.rainbow-connect-zone [data-rk] button,
+.rainbow-connect-zone > button {
+  border: 1px solid rgba(0, 231, 255, 0.3) !important;
+  background: rgba(0, 231, 255, 0.1) !important;
+  color: #9af7ff !important;
+  box-shadow: 0 12px 28px rgba(0, 231, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
 section,
 article,
 div {

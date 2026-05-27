@@ -68,7 +68,7 @@ Invoke-RestMethod -Uri http://localhost:3000/api/community/vote -Method Post -Co
 } | ConvertTo-Json)
 ```
 
-The community system persists wallet profiles, unique display names, one weighted vote per wallet per contract, admin trust badges, suspicious-account penalties, and aggregate trust scores. Set `PULSESHIELD_DATA_DIR` to a persistent path in production and protect `PULSESHIELD_ADMIN_KEY`.
+The community system persists wallet profiles, unique display names, one weighted vote per wallet per contract, admin trust badges, suspicious-account penalties, and aggregate trust scores. The frontend uses RainbowKit/Wagmi for wallet login on PulseChain. Set `PULSESHIELD_DATA_DIR` to a persistent path in production, protect `PULSESHIELD_ADMIN_KEY`, and add `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for full WalletConnect support.
 
 Feedback submissions:
 
@@ -94,6 +94,7 @@ Recommended: Vercel, because this is a Next.js app with API routes.
    - `PULSECHAIN_EXPLORER_API`
    - `PULSESHIELD_DATA_DIR`
    - `PULSESHIELD_ADMIN_KEY`
+   - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
    - `FEEDBACK_TO_EMAIL`
    - `SMTP_HOST`
    - `SMTP_PORT`
