@@ -1683,7 +1683,7 @@ export default function Home() {
         <nav className="uhd-nav sticky top-3 z-30 mb-5 flex flex-col gap-3 rounded-xl px-3 py-3 md:flex-row md:items-center md:justify-between">
           <a href="#top" className="nav-brand group flex items-center gap-3">
             <span className="nav-mark grid h-11 w-11 place-items-center rounded-lg border border-[#00e7ff]/30 bg-black/55 text-[#00e7ff] shadow-[0_0_24px_rgba(0,231,255,.22)]">
-              <img src="/assets/pulseshield-shield.png" alt="PulseShield shield" className="h-7 w-7 object-contain drop-shadow-[0_0_10px_rgba(0,231,255,.45)]" />
+              <img src="/assets/pulseshield-shield-bright.png" alt="PulseShield shield" className="pulse-shield-logo h-8 w-8 object-contain" />
             </span>
             <span>
               <span className="nav-logo block text-sm font-black uppercase tracking-[0.2em] text-white">PulseShield<span>.io</span></span>
