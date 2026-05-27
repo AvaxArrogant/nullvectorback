@@ -511,6 +511,16 @@ function normalizeClientAddress(address) {
   return /^0x[a-fA-F0-9]{40}$/.test(value) ? value.toLowerCase() : "";
 }
 
+function approvalKey(value) {
+  return normalizeClientAddress(value) || String(value || "").trim().toLowerCase();
+}
+
+function findApprovalForTarget(approvals, target) {
+  const key = approvalKey(target);
+  if (!key) return null;
+  return approvals?.find((approval) => approvalKey(approval.target) === key) || null;
+}
+
 function WalletIdentityPanel({
   walletAddress,
   walletProfile,
@@ -727,6 +737,8 @@ function AdminDashboard({
   adminRole,
   adminAuditor,
   adminSuspicious,
+  activeScanTarget,
+  currentApproval,
   approvalTarget,
   approvalProject,
   approvalSealId,
@@ -739,6 +751,7 @@ function AdminDashboard({
   onAdminRoleChange,
   onAdminAuditorChange,
   onAdminSuspiciousChange,
+  onUseActiveTarget,
   onApprovalTargetChange,
   onApprovalProjectChange,
   onApprovalSealIdChange,
@@ -891,6 +904,27 @@ function AdminDashboard({
               <ShieldCheck size={17} /> Seal Approval Registry
             </h3>
             <div className="grid gap-3">
+              <div className="rounded-md border border-white/10 bg-black/35 p-3">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Active scan target</div>
+                <div className="mt-1 truncate font-mono text-xs text-slate-300" title={activeScanTarget || "No active scan"}>
+                  {activeScanTarget || "No active scan loaded"}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {currentApproval ? <ApprovalBadge approval={currentApproval} compact /> : (
+                    <span className="rounded border border-[#ffb347]/25 bg-[#ffb347]/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#ffe3ba]">
+                      Not approved
+                    </span>
+                  )}
+                  <button
+                    onClick={onUseActiveTarget}
+                    disabled={!activeScanTarget}
+                    className="rounded border border-[#00e7ff]/25 bg-[#00e7ff]/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#9af7ff] disabled:opacity-40"
+                    type="button"
+                  >
+                    Use active target
+                  </button>
+                </div>
+              </div>
               <Field label="Contract / project address">
                 <input
                   value={approvalTarget}
@@ -1418,7 +1452,8 @@ export default function Home() {
   const displayedFindings = scanReport?.findings?.length ? scanReport.findings : fallbackFindings;
   const displayedRiskLabels = scanReport?.riskLabels?.length ? scanReport.riskLabels : fallbackRiskLabels;
   const trustTarget = scanReport?.meta?.address || form.address;
-  const currentApproval = trustSnapshot?.approval || null;
+  const dashboardApproval = findApprovalForTarget(adminDashboard?.approvals, trustTarget);
+  const currentApproval = trustSnapshot?.approval || dashboardApproval || null;
   const isAdminWallet = walletAddress.toLowerCase() === adminWalletAddress;
   const canViewAdminDashboard = isAdminWallet || Boolean(trustSnapshot?.permissions?.canViewAdmin || walletProfile?.role === "admin" || walletProfile?.role === "moderator" || walletProfile?.role === "root");
   const isPulseChain = Boolean(isConnected && normalizeClientAddress(connectedAddress) && walletAddress && chainId === 369);
@@ -1478,6 +1513,7 @@ export default function Home() {
         setDisplayNameDraft(payload.profile.displayName || "");
       }
     }
+    return payload;
   }
 
   async function saveWalletProfile(address, displayName, walletActivity = "new") {
@@ -1632,6 +1668,7 @@ export default function Home() {
   async function submitApprovalUpdate() {
     setAdminDashboardError("");
     setAdminDashboardMessage("");
+    const nextTarget = approvalTarget || trustTarget;
     try {
       const response = await fetch("/api/community/admin", {
         method: "POST",
@@ -1640,7 +1677,7 @@ export default function Home() {
           action: "approval.upsert",
           actorAddress: walletAddress,
           adminKey,
-          target: approvalTarget,
+          target: nextTarget,
           projectName: approvalProject,
           sealId: approvalSealId,
           notes: approvalNotes,
@@ -1649,6 +1686,9 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Approval update failed.");
       if (payload.dashboard) setAdminDashboard(payload.dashboard);
+      if (approvalKey(nextTarget) === approvalKey(trustTarget)) {
+        setTrustSnapshot((current) => ({ ...(current || {}), approval: payload.approval || current?.approval || null }));
+      }
       await fetchTrustSnapshot(trustTarget, walletAddress);
       setAdminDashboardMessage("PulseShield seal approval saved.");
     } catch (error) {
@@ -1659,6 +1699,7 @@ export default function Home() {
   async function revokeApproval(approval) {
     setAdminDashboardError("");
     setAdminDashboardMessage("");
+    const nextTarget = approval?.target || approvalTarget;
     try {
       const response = await fetch("/api/community/admin", {
         method: "POST",
@@ -1667,16 +1708,28 @@ export default function Home() {
           action: "approval.revoke",
           actorAddress: walletAddress,
           adminKey,
-          target: approval?.target || approvalTarget,
+          target: nextTarget,
         }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Approval revoke failed.");
       if (payload.dashboard) setAdminDashboard(payload.dashboard);
+      if (approvalKey(nextTarget) === approvalKey(trustTarget)) {
+        setTrustSnapshot((current) => ({ ...(current || {}), approval: null }));
+      }
       await fetchTrustSnapshot(trustTarget, walletAddress);
       setAdminDashboardMessage("PulseShield seal approval revoked.");
     } catch (error) {
       setAdminDashboardError(error.message);
+    }
+  }
+
+  function useActiveApprovalTarget() {
+    setApprovalTarget(trustTarget || "");
+    setApprovalProject(scanReport?.meta?.token?.name || scanReport?.meta?.token?.symbol || "");
+    if (currentApproval) {
+      setApprovalSealId(currentApproval.sealId || "");
+      setApprovalNotes(currentApproval.notes || "");
     }
   }
 
@@ -1726,6 +1779,7 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Scan failed.");
       setScanReport(payload);
+      await fetchTrustSnapshot(payload.meta?.address || form.address, walletAddress);
       setMarketError("");
       const marketResponse = await fetch("/api/market", {
         method: "POST",
@@ -2450,6 +2504,8 @@ export default function Home() {
             adminRole={adminRole}
             adminAuditor={adminAuditor}
             adminSuspicious={adminSuspicious}
+            activeScanTarget={trustTarget}
+            currentApproval={currentApproval}
             approvalTarget={approvalTarget}
             approvalProject={approvalProject}
             approvalSealId={approvalSealId}
@@ -2462,6 +2518,7 @@ export default function Home() {
             onAdminRoleChange={setAdminRole}
             onAdminAuditorChange={setAdminAuditor}
             onAdminSuspiciousChange={setAdminSuspicious}
+            onUseActiveTarget={useActiveApprovalTarget}
             onApprovalTargetChange={setApprovalTarget}
             onApprovalProjectChange={setApprovalProject}
             onApprovalSealIdChange={setApprovalSealId}
