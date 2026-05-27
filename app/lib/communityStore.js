@@ -18,6 +18,7 @@ const defaultStore = {
   profiles: {},
   displayNames: {},
   votes: {},
+  approvals: {},
   auditLog: [],
   updatedAt: null,
 };
@@ -170,13 +171,15 @@ export async function getCommunitySnapshot(target, address) {
   const store = await ensureStore();
   const normalized = normalizeAddress(address);
   const profile = store.profiles[normalized];
+  const key = targetKey(target);
   return {
     ok: true,
     voteOptions: voteOptions(),
-    aggregate: aggregateVotes(store, target),
+    aggregate: aggregateVotes(store, key),
     profile: publicProfile(profile),
     permissions: adminPermissions(store, normalized),
-    userVote: normalized ? store.votes[targetKey(target)]?.[normalized] || null : null,
+    approval: key ? store.approvals?.[key] || null : null,
+    userVote: normalized ? store.votes[key]?.[normalized] || null : null,
   };
 }
 
@@ -250,12 +253,27 @@ function flattenVotes(store) {
   ));
 }
 
+function publicApproval(approval) {
+  if (!approval) return null;
+  return {
+    target: approval.target,
+    projectName: approval.projectName || "",
+    sealId: approval.sealId || "",
+    notes: approval.notes || "",
+    approvedBy: approval.approvedBy || "",
+    approvedAt: approval.approvedAt,
+    updatedAt: approval.updatedAt,
+    status: approval.status || "approved",
+  };
+}
+
 export async function getAdminDashboard({ actorAddress, adminKey }) {
   const store = await ensureStore();
   const permissions = assertAdminAccess(store, actorAddress, adminKey);
   const profiles = Object.values(store.profiles || {}).map(publicProfile);
   const votes = flattenVotes(store).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   const targets = Object.keys(store.votes || {});
+  const approvals = Object.values(store.approvals || {}).map(publicApproval).sort((a, b) => String(b.updatedAt || b.approvedAt).localeCompare(String(a.updatedAt || a.approvedAt)));
 
   return {
     ok: true,
@@ -269,11 +287,13 @@ export async function getAdminDashboard({ actorAddress, adminKey }) {
       admins: profiles.filter((profile) => ["root", "admin"].includes(profile.role)).length,
       moderators: profiles.filter((profile) => profile.role === "moderator").length,
       suspicious: profiles.filter((profile) => profile.suspicious).length,
+      approvedProjects: approvals.length,
     },
     users: profiles
       .sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)))
       .slice(0, 120),
     votes: votes.slice(0, 160),
+    approvals: approvals.slice(0, 160),
     auditLog: (store.auditLog || []).slice(-80).reverse(),
   };
 }
@@ -329,12 +349,39 @@ export async function adminUpdate({
   target,
   voteAddress,
   reason,
+  projectName,
+  sealId,
+  notes,
 }) {
   const normalized = normalizeAddress(address);
 
   return mutateStore((store) => {
     const permission = action === "vote.moderate" || action === "vote.restore" || action === "vote.delete" ? "canModerate" : "canManageUsers";
     const permissions = assertAdminAccess(store, actorAddress, adminKey, permission);
+
+    if (action === "approval.upsert" || action === "approval.revoke") {
+      const key = targetKey(target || address);
+      if (!key) throw new Error("Enter a valid project or contract target.");
+      store.approvals = store.approvals || {};
+      if (action === "approval.revoke") {
+        delete store.approvals[key];
+      } else {
+        const existing = store.approvals[key] || { target: key, approvedAt: now() };
+        store.approvals[key] = {
+          ...existing,
+          target: key,
+          projectName: clean(projectName, 80),
+          sealId: clean(sealId, 80) || `PS-${key.slice(2, 8).toUpperCase()}`,
+          notes: clean(notes, 280),
+          status: "approved",
+          approvedBy: normalizeAddress(actorAddress),
+          updatedAt: now(),
+        };
+      }
+      store.auditLog.push({ action, target: key, by: normalizeAddress(actorAddress), updatedAt: now() });
+      store.auditLog = store.auditLog.slice(-200);
+      return { ok: true, permissions, approval: publicApproval(store.approvals[key]) };
+    }
 
     if (action === "vote.moderate" || action === "vote.restore" || action === "vote.delete") {
       const key = targetKey(target);

@@ -727,6 +727,10 @@ function AdminDashboard({
   adminRole,
   adminAuditor,
   adminSuspicious,
+  approvalTarget,
+  approvalProject,
+  approvalSealId,
+  approvalNotes,
   moderationReason,
   onRefresh,
   onAdminKeyChange,
@@ -735,14 +739,21 @@ function AdminDashboard({
   onAdminRoleChange,
   onAdminAuditorChange,
   onAdminSuspiciousChange,
+  onApprovalTargetChange,
+  onApprovalProjectChange,
+  onApprovalSealIdChange,
+  onApprovalNotesChange,
   onModerationReasonChange,
   onProfileUpdate,
+  onApprovalSubmit,
+  onApprovalRevoke,
   onModerateVote,
 }) {
   const permissions = dashboard?.permissions || {};
   const stats = dashboard?.stats || {};
   const users = dashboard?.users || [];
   const votes = dashboard?.votes || [];
+  const approvals = dashboard?.approvals || [];
   const auditLog = dashboard?.auditLog || [];
 
   return (
@@ -781,6 +792,7 @@ function AdminDashboard({
           ["Admins", stats.admins || 0],
           ["Moderators", stats.moderators || 0],
           ["Targets", stats.targets || 0],
+          ["Approved", stats.approvedProjects || 0],
           ["Flagged users", stats.suspicious || 0],
         ].map(([label, value]) => (
           <div key={label} className="rounded-md border border-white/10 bg-black/30 p-3">
@@ -873,9 +885,100 @@ function AdminDashboard({
               )) : <div className="text-sm text-slate-500">No admin actions recorded yet.</div>}
             </div>
           </div>
+
+          <div className="rounded-lg border border-[#63ff9d]/20 bg-[#63ff9d]/5 p-3">
+            <h3 className="mb-3 flex items-center gap-2 font-bold text-[#b8ffd0]">
+              <ShieldCheck size={17} /> Seal Approval Registry
+            </h3>
+            <div className="grid gap-3">
+              <Field label="Contract / project address">
+                <input
+                  value={approvalTarget}
+                  onChange={(event) => onApprovalTargetChange(event.target.value)}
+                  placeholder="0x..."
+                  className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#63ff9d]"
+                />
+              </Field>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Field label="Project name">
+                  <input
+                    value={approvalProject}
+                    onChange={(event) => onApprovalProjectChange(event.target.value)}
+                    placeholder="Project / token name"
+                    className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#63ff9d]"
+                  />
+                </Field>
+                <Field label="Seal ID">
+                  <input
+                    value={approvalSealId}
+                    onChange={(event) => onApprovalSealIdChange(event.target.value)}
+                    placeholder="Optional"
+                    className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#63ff9d]"
+                  />
+                </Field>
+              </div>
+              <Field label="Approval notes">
+                <textarea
+                  value={approvalNotes}
+                  onChange={(event) => onApprovalNotesChange(event.target.value)}
+                  rows={3}
+                  placeholder="Manual audit completed, fixes verified, approval context..."
+                  className="resize-none rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#63ff9d]"
+                />
+              </Field>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  onClick={onApprovalSubmit}
+                  disabled={!permissions.canManageUsers}
+                  className="rounded-md border border-[#63ff9d]/30 bg-[#63ff9d]/10 px-3 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#b8ffd0] transition hover:border-[#00e7ff]/45 disabled:cursor-not-allowed disabled:opacity-45"
+                  type="button"
+                >
+                  Mark approved
+                </button>
+                <button
+                  onClick={() => onApprovalRevoke({ target: approvalTarget })}
+                  disabled={!permissions.canManageUsers}
+                  className="rounded-md border border-[#ff4dce]/30 bg-[#ff4dce]/10 px-3 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#ffc2f6] transition hover:border-[#00e7ff]/45 disabled:cursor-not-allowed disabled:opacity-45"
+                  type="button"
+                >
+                  Revoke seal
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-4">
+          <div className="rounded-lg border border-[#63ff9d]/18 bg-black/30 p-3">
+            <h3 className="mb-3 flex items-center gap-2 font-bold text-[#b8ffd0]">
+              <ShieldCheck size={17} /> Approved Projects
+            </h3>
+            <div className="grid max-h-72 gap-2 overflow-auto pr-1">
+              {approvals.length ? approvals.map((approval) => (
+                <button
+                  key={approval.target}
+                  onClick={() => {
+                    onApprovalTargetChange(approval.target);
+                    onApprovalProjectChange(approval.projectName || "");
+                    onApprovalSealIdChange(approval.sealId || "");
+                    onApprovalNotesChange(approval.notes || "");
+                  }}
+                  className="rounded-md border border-white/10 bg-white/[0.025] p-3 text-left transition hover:border-[#63ff9d]/35"
+                  type="button"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-black text-white">{approval.projectName || shortAddress(approval.target)}</div>
+                      <div className="mt-1 truncate font-mono text-[11px] text-slate-500">{approval.target}</div>
+                    </div>
+                    <ApprovalBadge approval={approval} compact />
+                  </div>
+                  <div className="mt-2 text-xs text-slate-400">{approval.sealId || "No seal ID"} / {approval.updatedAt || approval.approvedAt}</div>
+                </button>
+              )) : <div className="text-sm text-slate-500">No PulseShield-approved projects yet.</div>}
+            </div>
+          </div>
+
           <div className="rounded-lg border border-[#00e7ff]/18 bg-black/30 p-3">
             <h3 className="mb-3 flex items-center gap-2 font-bold text-[#9af7ff]">
               <MessageSquare size={17} /> Voting Comments Moderation
@@ -1167,7 +1270,20 @@ function MarketDock({ marketReport, onExpand }) {
   );
 }
 
-function TokenResultHeader({ scanReport, marketReport, onExpandMarket }) {
+function ApprovalBadge({ approval, compact = false }) {
+  if (!approval) return null;
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-2 rounded-md border border-[#63ff9d]/35 bg-[#63ff9d]/10 font-black uppercase tracking-[0.13em] text-[#b8ffd0] shadow-[0_0_18px_rgba(99,255,157,.12)] ${compact ? "px-2 py-1 text-[10px]" : "px-2.5 py-1.5 text-[11px]"}`}
+      title={approval.sealId ? `PulseShield.io approved seal ${approval.sealId}` : "PulseShield.io approved"}
+    >
+      <img src="/assets/pulseshield-shield-bright.png" alt="" className={compact ? "h-4 w-4 object-contain" : "h-5 w-5 object-contain"} />
+      PulseShield Approved
+    </span>
+  );
+}
+
+function TokenResultHeader({ scanReport, marketReport, approval, onExpandMarket }) {
   if (!scanReport) return null;
   const token = scanReport.meta?.token || {};
   const pair = marketReport?.primaryPair;
@@ -1183,6 +1299,7 @@ function TokenResultHeader({ scanReport, marketReport, onExpandMarket }) {
           <div className="mt-1 flex flex-wrap items-baseline gap-2">
             <h2 className="truncate text-2xl font-black leading-tight sm:text-3xl">{symbol}</h2>
             <span className="min-w-0 truncate text-sm text-slate-400">{name}</span>
+            <ApprovalBadge approval={approval} compact />
           </div>
           <div className="mt-2 truncate font-mono text-[11px] text-slate-500">{scanReport.meta?.address}</div>
         </div>
@@ -1256,6 +1373,10 @@ export default function Home() {
   const [adminRole, setAdminRole] = useState("user");
   const [adminAuditor, setAdminAuditor] = useState(false);
   const [adminSuspicious, setAdminSuspicious] = useState(false);
+  const [approvalTarget, setApprovalTarget] = useState("");
+  const [approvalProject, setApprovalProject] = useState("");
+  const [approvalSealId, setApprovalSealId] = useState("");
+  const [approvalNotes, setApprovalNotes] = useState("");
   const [adminModerationReason, setAdminModerationReason] = useState("");
   const [form, setForm] = useState({
     address: sampleAddress,
@@ -1297,6 +1418,7 @@ export default function Home() {
   const displayedFindings = scanReport?.findings?.length ? scanReport.findings : fallbackFindings;
   const displayedRiskLabels = scanReport?.riskLabels?.length ? scanReport.riskLabels : fallbackRiskLabels;
   const trustTarget = scanReport?.meta?.address || form.address;
+  const currentApproval = trustSnapshot?.approval || null;
   const isAdminWallet = walletAddress.toLowerCase() === adminWalletAddress;
   const canViewAdminDashboard = isAdminWallet || Boolean(trustSnapshot?.permissions?.canViewAdmin || walletProfile?.role === "admin" || walletProfile?.role === "moderator" || walletProfile?.role === "root");
   const isPulseChain = Boolean(isConnected && normalizeClientAddress(connectedAddress) && walletAddress && chainId === 369);
@@ -1507,6 +1629,57 @@ export default function Home() {
     }
   }
 
+  async function submitApprovalUpdate() {
+    setAdminDashboardError("");
+    setAdminDashboardMessage("");
+    try {
+      const response = await fetch("/api/community/admin", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "approval.upsert",
+          actorAddress: walletAddress,
+          adminKey,
+          target: approvalTarget,
+          projectName: approvalProject,
+          sealId: approvalSealId,
+          notes: approvalNotes,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Approval update failed.");
+      if (payload.dashboard) setAdminDashboard(payload.dashboard);
+      await fetchTrustSnapshot(trustTarget, walletAddress);
+      setAdminDashboardMessage("PulseShield seal approval saved.");
+    } catch (error) {
+      setAdminDashboardError(error.message);
+    }
+  }
+
+  async function revokeApproval(approval) {
+    setAdminDashboardError("");
+    setAdminDashboardMessage("");
+    try {
+      const response = await fetch("/api/community/admin", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "approval.revoke",
+          actorAddress: walletAddress,
+          adminKey,
+          target: approval?.target || approvalTarget,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Approval revoke failed.");
+      if (payload.dashboard) setAdminDashboard(payload.dashboard);
+      await fetchTrustSnapshot(trustTarget, walletAddress);
+      setAdminDashboardMessage("PulseShield seal approval revoked.");
+    } catch (error) {
+      setAdminDashboardError(error.message);
+    }
+  }
+
   async function moderateVote(action, vote) {
     setAdminDashboardError("");
     setAdminDashboardMessage("");
@@ -1662,6 +1835,13 @@ export default function Home() {
   useEffect(() => {
     fetchTrustSnapshot(trustTarget, walletAddress).catch(() => null);
   }, [trustTarget, walletAddress]);
+
+  useEffect(() => {
+    if (canViewAdminDashboard && normalizeClientAddress(trustTarget)) {
+      setApprovalTarget(trustTarget);
+      setApprovalProject(scanReport?.meta?.token?.name || scanReport?.meta?.token?.symbol || "");
+    }
+  }, [canViewAdminDashboard, trustTarget, scanReport]);
 
   useEffect(() => {
     if (canViewAdminDashboard) {
@@ -1914,6 +2094,7 @@ export default function Home() {
                       <span className="rounded border border-[#ff4dce]/20 bg-[#ff4dce]/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-[#ffc2f6]">
                         {detectedProjectType}
                       </span>
+                      <ApprovalBadge approval={currentApproval} compact />
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
@@ -1943,6 +2124,7 @@ export default function Home() {
                   <TokenResultHeader
                     scanReport={scanReport}
                     marketReport={marketReport}
+                    approval={currentApproval}
                     onExpandMarket={() => setIsMarketOpen(true)}
                   />
 
@@ -2268,6 +2450,10 @@ export default function Home() {
             adminRole={adminRole}
             adminAuditor={adminAuditor}
             adminSuspicious={adminSuspicious}
+            approvalTarget={approvalTarget}
+            approvalProject={approvalProject}
+            approvalSealId={approvalSealId}
+            approvalNotes={approvalNotes}
             moderationReason={adminModerationReason}
             onRefresh={fetchAdminDashboard}
             onAdminKeyChange={setAdminKey}
@@ -2276,8 +2462,14 @@ export default function Home() {
             onAdminRoleChange={setAdminRole}
             onAdminAuditorChange={setAdminAuditor}
             onAdminSuspiciousChange={setAdminSuspicious}
+            onApprovalTargetChange={setApprovalTarget}
+            onApprovalProjectChange={setApprovalProject}
+            onApprovalSealIdChange={setApprovalSealId}
+            onApprovalNotesChange={setApprovalNotes}
             onModerationReasonChange={setAdminModerationReason}
             onProfileUpdate={submitAdminUpdate}
+            onApprovalSubmit={submitApprovalUpdate}
+            onApprovalRevoke={revokeApproval}
             onModerateVote={moderateVote}
           />
         ) : null}
