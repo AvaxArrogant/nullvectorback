@@ -110,6 +110,7 @@ const chainProfiles = {
   PulseChain: { explorer: "scan.pulsechain.com", native: "PLS", rpc: "PulseChain mainnet" },
 };
 const sampleAddress = "0xA1077a294dDE1B09bB078844df40758a5D0f9a27";
+const adminWalletAddress = "0x85e6cc88f3055b589eb1d4030863be2cfcc0763e";
 
 const navItems = [
   ["Scan", "#scan"],
@@ -602,6 +603,7 @@ function CommunityTrustPanel({
   selectedTrustVote,
   voteNote,
   walletAddress,
+  isAdminWallet,
   communityMessage,
   communityError,
   adminOpen,
@@ -702,16 +704,18 @@ function CommunityTrustPanel({
       {communityMessage ? <div className="mt-3 rounded-md border border-[#63ff9d]/30 bg-[#63ff9d]/10 p-3 text-sm text-[#b8ffd0]">{communityMessage}</div> : null}
       {communityError ? <div className="mt-3 rounded-md border border-[#ffb347]/30 bg-[#ffb347]/10 p-3 text-sm text-[#ffe3ba]">{communityError}</div> : null}
 
-      <button
-        onClick={onAdminOpen}
-        className="mt-4 flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400 transition hover:border-[#ff4dce]/35 hover:text-[#ffc2f6]"
-        type="button"
-      >
-        <span className="flex items-center gap-2"><Crown size={14} /> Admin trust controls</span>
-        <ChevronDown size={15} className={`transition-transform ${adminOpen ? "rotate-180" : ""}`} />
-      </button>
+      {isAdminWallet ? (
+        <button
+          onClick={onAdminOpen}
+          className="mt-4 flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400 transition hover:border-[#ff4dce]/35 hover:text-[#ffc2f6]"
+          type="button"
+        >
+          <span className="flex items-center gap-2"><Crown size={14} /> Admin trust controls</span>
+          <ChevronDown size={15} className={`transition-transform ${adminOpen ? "rotate-180" : ""}`} />
+        </button>
+      ) : null}
 
-      {adminOpen ? (
+      {isAdminWallet && adminOpen ? (
         <div className="mt-3 grid gap-3 rounded-lg border border-[#ff4dce]/20 bg-[#ff4dce]/5 p-3">
           <Field label="Admin key">
             <input
@@ -1063,6 +1067,7 @@ export default function Home() {
   const displayedFindings = scanReport?.findings?.length ? scanReport.findings : fallbackFindings;
   const displayedRiskLabels = scanReport?.riskLabels?.length ? scanReport.riskLabels : fallbackRiskLabels;
   const trustTarget = scanReport?.meta?.address || form.address;
+  const isAdminWallet = walletAddress.toLowerCase() === adminWalletAddress;
   const terminalLines = scanReport?.terminal ?? [
     "engine.boot: PulseShield online",
     `chain.profile: ${chainProfile.rpc} / native gas ${chainProfile.native}`,
@@ -1343,6 +1348,10 @@ export default function Home() {
   useEffect(() => {
     fetchTrustSnapshot(trustTarget, walletAddress).catch(() => null);
   }, [trustTarget, walletAddress]);
+
+  useEffect(() => {
+    if (!isAdminWallet && adminOpen) setAdminOpen(false);
+  }, [isAdminWallet, adminOpen]);
 
   useEffect(() => {
     if (!window.ethereum?.on) return undefined;
@@ -1935,6 +1944,7 @@ export default function Home() {
               selectedTrustVote={selectedTrustVote}
               voteNote={voteNote}
               walletAddress={walletAddress}
+              isAdminWallet={isAdminWallet}
               communityMessage={communityMessage}
               communityError={communityError}
               adminOpen={adminOpen}
