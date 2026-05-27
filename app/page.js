@@ -21,9 +21,12 @@ import {
   Info,
   Layers,
   LockKeyhole,
+  Mail,
+  MessageSquare,
   Network,
   Radar,
   ScanLine,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Skull,
@@ -111,6 +114,7 @@ const navItems = [
   ["Dashboard", "#dashboard"],
   ["Threat Graph", "#graph"],
   ["Modules", "#modules"],
+  ["Feedback", "#feedback"],
   ["Ecosystem", "#ecosystem"],
 ];
 
@@ -736,12 +740,20 @@ export default function Home() {
   const [targetExpanded, setTargetExpanded] = useState(true);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState("contract");
+  const [isFeedbackSending, setIsFeedbackSending] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState(null);
   const [form, setForm] = useState({
     address: sampleAddress,
     owner: "",
     proxy: "",
     docs: "",
     source: "",
+  });
+  const [feedbackForm, setFeedbackForm] = useState({
+    category: "Feature idea",
+    email: "",
+    message: "",
+    website: "",
   });
 
   const heuristicScore = useMemo(() => {
@@ -843,6 +855,31 @@ export default function Home() {
       setMarketReport(null);
     } finally {
       setIsScanning(false);
+    }
+  }
+
+  async function submitFeedback(event) {
+    event.preventDefault();
+    setIsFeedbackSending(true);
+    setFeedbackStatus(null);
+
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...feedbackForm,
+          path: typeof window !== "undefined" ? window.location.href : "pulseshield.io",
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Feedback could not be sent.");
+      setFeedbackStatus({ type: "success", message: payload.message || "Feedback sent to PulseShield." });
+      setFeedbackForm((current) => ({ ...current, message: "", website: "" }));
+    } catch (error) {
+      setFeedbackStatus({ type: "error", message: error.message });
+    } finally {
+      setIsFeedbackSending(false);
     }
   }
 
@@ -1466,6 +1503,99 @@ export default function Home() {
             </div>
           </Panel>
         </div>
+
+        <Panel id="feedback" className="uhd-panel mt-4 overflow-hidden p-4">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(320px,1fr)]">
+            <div className="min-w-0">
+              <div className="mb-3 flex items-center gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-md border border-[#00e7ff]/30 bg-[#00e7ff]/10 text-[#9af7ff] shadow-[0_0_24px_rgba(0,231,255,.18)]">
+                  <MessageSquare size={20} />
+                </span>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-[#ff6bff]">PulseShield Signal Line</div>
+                  <h2 className="text-2xl font-black text-white">Feedback & Feature Requests</h2>
+                </div>
+              </div>
+              <p className="max-w-2xl text-sm leading-6 text-slate-300">
+                Send scan feedback, bug reports, and product ideas directly to the PulseShield inbox. Include a contract address
+                or page context when it helps reproduce the issue.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {["Feature ideas", "Scan corrections", "UI issues"].map((item, index) => (
+                  <div key={item} className="rounded-md border border-white/10 bg-black/30 p-3">
+                    {index === 0 ? <Zap size={16} className="mb-2 text-[#ffb347]" /> : index === 1 ? <ScanLine size={16} className="mb-2 text-[#00e7ff]" /> : <Eye size={16} className="mb-2 text-[#ff4dce]" />}
+                    <div className="text-sm font-bold text-white">{item}</div>
+                    <div className="mt-1 text-xs text-slate-500">Routes to contact@pulseshield.io</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={submitFeedback} className="grid min-w-0 gap-3 rounded-lg border border-[#00e7ff]/18 bg-black/30 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.055)]">
+              <input
+                className="hidden"
+                tabIndex={-1}
+                autoComplete="off"
+                value={feedbackForm.website}
+                onChange={(event) => setFeedbackForm({ ...feedbackForm, website: event.target.value })}
+                aria-hidden="true"
+              />
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+                <Field label="Category">
+                  <select
+                    value={feedbackForm.category}
+                    onChange={(event) => setFeedbackForm({ ...feedbackForm, category: event.target.value })}
+                    className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-[#00e7ff]"
+                  >
+                    <option>Feature idea</option>
+                    <option>Bug report</option>
+                    <option>Scan result feedback</option>
+                    <option>UI feedback</option>
+                    <option>Partnership</option>
+                    <option>Other</option>
+                  </select>
+                </Field>
+                <Field label="Reply email optional">
+                  <input
+                    type="email"
+                    value={feedbackForm.email}
+                    onChange={(event) => setFeedbackForm({ ...feedbackForm, email: event.target.value })}
+                    placeholder="you@example.com"
+                    className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#00e7ff]"
+                  />
+                </Field>
+              </div>
+              <Field label="Message">
+                <textarea
+                  required
+                  minLength={12}
+                  rows={5}
+                  value={feedbackForm.message}
+                  onChange={(event) => setFeedbackForm({ ...feedbackForm, message: event.target.value })}
+                  placeholder="Tell us what should be improved, corrected, or built next."
+                  className="resize-none rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
+                />
+              </Field>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <a href="mailto:contact@pulseshield.io" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400 transition hover:text-[#9af7ff]">
+                  <Mail size={14} /> contact@pulseshield.io
+                </a>
+                <button
+                  type="submit"
+                  disabled={isFeedbackSending}
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-[#00e7ff]/35 bg-[#00e7ff]/12 px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-[#9af7ff] shadow-[0_12px_28px_rgba(0,231,255,.12),inset_0_1px_0_rgba(255,255,255,.12)] transition hover:border-[#ff4dce]/45 hover:bg-[#ff4dce]/12 hover:text-[#ffc2f6] active:translate-y-1 disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  <Send size={16} /> {isFeedbackSending ? "Sending" : "Send feedback"}
+                </button>
+              </div>
+              {feedbackStatus ? (
+                <div className={`rounded-md border p-3 text-sm ${feedbackStatus.type === "success" ? "border-[#63ff9d]/30 bg-[#63ff9d]/10 text-[#b8ffd0]" : "border-[#ffb347]/30 bg-[#ffb347]/10 text-[#ffe3ba]"}`}>
+                  {feedbackStatus.message}
+                </div>
+              ) : null}
+            </form>
+          </div>
+        </Panel>
 
         <footer id="ecosystem" className="uhd-footer mt-5 overflow-hidden rounded-lg border border-[#00e7ff]/20 bg-black/45">
           <div className="grid gap-5 p-5 xl:grid-cols-[1.1fr_.9fr_.9fr]">

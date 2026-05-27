@@ -75,6 +75,20 @@ PULSECHAIN_RPC_URL=https://rpc.pulsechain.com
 PULSECHAIN_EXPLORER_API=https://scan.pulsechain.com/api
 ```
 
+Feedback email relay:
+
+```bash
+FEEDBACK_TO_EMAIL=contact@pulseshield.io
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=contact@pulseshield.io
+SMTP_PASS=YOUR_MAILBOX_PASSWORD
+SMTP_FROM=contact@pulseshield.io
+```
+
+Create the `contact@pulseshield.io` mailbox in Hostinger first, then place the mailbox password only in `.env.production` on the VPS.
+
 ## 6. Start the app
 
 ```bash
@@ -162,6 +176,7 @@ The current production service includes the live Next.js backend routes:
 
 - `/api/scan`
 - `/api/market`
+- `/api/feedback`
 - `/api/health`
 
 The VPS has enough RAM to add worker containers later for Slither, Mythril, Semgrep, queue processing, Supabase sync, report caching, or a private RPC/indexing layer.

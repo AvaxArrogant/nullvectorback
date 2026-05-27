@@ -50,6 +50,18 @@ Invoke-RestMethod -Uri http://localhost:3000/api/market -Method Post -ContentTyp
 
 The market endpoint uses DexScreener token-pair data to rank active trading pairs, summarize live price/liquidity/volume/trade-flow, generate chart-ready market data, and attach market-context warnings.
 
+Feedback submissions:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:3000/api/feedback -Method Post -ContentType 'application/json' -Body (@{
+  category='Feature idea'
+  email='optional@example.com'
+  message='Add an exportable PDF audit report.'
+} | ConvertTo-Json)
+```
+
+`/api/feedback` relays site feedback and feature requests to `contact@pulseshield.io` when SMTP variables are configured. Keep `SMTP_PASS` only in local/VPS environment files, never in git.
+
 ## Put it online for browser testing
 
 Recommended: Vercel, because this is a Next.js app with API routes.
@@ -60,6 +72,13 @@ Recommended: Vercel, because this is a Next.js app with API routes.
 4. Add environment variables from `.env.example`:
    - `PULSECHAIN_RPC_URL`
    - `PULSECHAIN_EXPLORER_API`
+   - `FEEDBACK_TO_EMAIL`
+   - `SMTP_HOST`
+   - `SMTP_PORT`
+   - `SMTP_SECURE`
+   - `SMTP_USER`
+   - `SMTP_PASS`
+   - `SMTP_FROM`
 5. Deploy.
 
 After deploy, test:
