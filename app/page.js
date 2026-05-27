@@ -11,6 +11,7 @@ import {
   BarChart3,
   Cpu,
   ChevronDown,
+  Crown,
   ExternalLink,
   Crosshair,
   Eye,
@@ -33,6 +34,7 @@ import {
   SlidersHorizontal,
   Terminal,
   TrendingUp,
+  UserRound,
   Vote,
   Wallet,
   X,
@@ -114,6 +116,7 @@ const navItems = [
   ["Dashboard", "#dashboard"],
   ["Threat Graph", "#graph"],
   ["Modules", "#modules"],
+  ["Trust", "#trust"],
   ["Feedback", "#feedback"],
   ["Ecosystem", "#ecosystem"],
 ];
@@ -293,13 +296,15 @@ const radarData = [
   { subject: "Community", value: 48 },
 ];
 
-const votes = [
-  ["Suspicious", 42, "weighted"],
-  ["Needs Manual Review", 28, "auditor"],
-  ["False Positive", 13, "verified"],
-  ["Confirmed Malicious", 11, "auditor"],
-  ["Confirmed Safe", 6, "new"],
+const defaultTrustTotals = [
+  { label: "Confirmed Safe", percent: 0, count: 0, weight: 0, tone: "safe" },
+  { label: "Suspicious", percent: 0, count: 0, weight: 0, tone: "warning" },
+  { label: "Confirmed Malicious", percent: 0, count: 0, weight: 0, tone: "danger" },
+  { label: "False Positive", percent: 0, count: 0, weight: 0, tone: "info" },
+  { label: "Needs Manual Review", percent: 0, count: 0, weight: 0, tone: "review" },
 ];
+
+const trustVoteOptions = defaultTrustTotals.map((item) => item.label);
 
 const nodeDefaults = { sourcePosition: "right", targetPosition: "left" };
 
@@ -489,6 +494,273 @@ function Field({ label, children }) {
 
 function Panel({ children, className = "", ...props }) {
   return <section className={`glass rounded-lg ${className}`} {...props}>{children}</section>;
+}
+
+function displayIdentity(address, profile) {
+  return profile?.displayName || shortAddress(address) || "Connect wallet";
+}
+
+function normalizeClientAddress(address) {
+  const value = String(address || "").trim();
+  return /^0x[a-fA-F0-9]{40}$/.test(value) ? value.toLowerCase() : "";
+}
+
+function WalletIdentityPanel({
+  walletAddress,
+  walletProfile,
+  walletError,
+  walletMessage,
+  displayNameDraft,
+  isWalletBusy,
+  onConnect,
+  onDisconnect,
+  onNameChange,
+  onSaveName,
+}) {
+  const connected = Boolean(walletAddress);
+  return (
+    <Panel id="trust" className="uhd-panel p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-bold">
+          <UserRound size={18} className="text-[#00e7ff]" />
+          Wallet Identity
+        </h2>
+        {walletProfile?.auditorBadge ? (
+          <span className="rounded border border-[#ffb347]/35 bg-[#ffb347]/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#ffe3ba]">
+            Auditor
+          </span>
+        ) : null}
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-black/35 p-3">
+        <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Connected account</div>
+        <div className="mt-1 break-all font-mono text-sm text-slate-200">
+          {connected ? displayIdentity(walletAddress, walletProfile) : "No wallet connected"}
+        </div>
+        {connected ? <div className="mt-1 break-all font-mono text-[11px] text-slate-500">{walletAddress}</div> : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={connected ? onDisconnect : onConnect}
+            disabled={isWalletBusy}
+            className="rounded-md border border-[#00e7ff]/30 bg-[#00e7ff]/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#9af7ff] transition hover:border-[#ff4dce]/45 hover:bg-[#ff4dce]/10 disabled:opacity-50"
+            type="button"
+          >
+            {isWalletBusy ? "Syncing" : connected ? "Disconnect" : "Connect Wallet"}
+          </button>
+          <span className="rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs text-slate-400">
+            PulseChain community login
+          </span>
+        </div>
+      </div>
+
+      {connected ? (
+        <div className="mt-3 grid gap-2">
+          <Field label="Unique display name">
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <input
+                value={displayNameDraft}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="PulseShield name"
+                className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#00e7ff]"
+              />
+              <button
+                onClick={onSaveName}
+                disabled={isWalletBusy}
+                className="rounded-md border border-[#ff4dce]/30 bg-[#ff4dce]/10 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#ffc2f6] transition hover:border-[#00e7ff]/45 disabled:opacity-50"
+                type="button"
+              >
+                Save name
+              </button>
+            </div>
+          </Field>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="rounded-md border border-white/10 bg-white/[0.025] p-2">
+              <div className="font-black text-white">{walletProfile?.credibilityWeight || 1}x</div>
+              <div className="mt-1 text-slate-500">Weight</div>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/[0.025] p-2">
+              <div className="font-black text-white">{walletProfile?.accurateReports || 0}</div>
+              <div className="mt-1 text-slate-500">Reports</div>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/[0.025] p-2">
+              <div className="font-black text-white">{walletProfile?.status || "active"}</div>
+              <div className="mt-1 text-slate-500">Status</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {walletError ? <div className="mt-3 rounded-md border border-[#ffb347]/30 bg-[#ffb347]/10 p-3 text-sm text-[#ffe3ba]">{walletError}</div> : null}
+      {walletMessage ? <div className="mt-3 rounded-md border border-[#63ff9d]/30 bg-[#63ff9d]/10 p-3 text-sm text-[#b8ffd0]">{walletMessage}</div> : null}
+    </Panel>
+  );
+}
+
+function CommunityTrustPanel({
+  trustSnapshot,
+  trustTarget,
+  selectedTrustVote,
+  voteNote,
+  walletAddress,
+  communityMessage,
+  communityError,
+  adminOpen,
+  adminKey,
+  adminAddress,
+  adminReports,
+  adminAuditor,
+  adminSuspicious,
+  onVoteChange,
+  onNoteChange,
+  onCastVote,
+  onAdminOpen,
+  onAdminKeyChange,
+  onAdminAddressChange,
+  onAdminReportsChange,
+  onAdminAuditorChange,
+  onAdminSuspiciousChange,
+  onAdminSubmit,
+}) {
+  const totals = trustSnapshot?.aggregate?.totals?.length ? trustSnapshot.aggregate.totals : defaultTrustTotals;
+  const leader = trustSnapshot?.aggregate?.leader;
+  const userVote = trustSnapshot?.userVote?.vote;
+
+  return (
+    <Panel className="uhd-panel p-4">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-bold">
+            <Vote size={18} className="text-[#63ff9d]" />
+            Community Trust Voting
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">Weighted PulseChain wallet reputation for the active target.</p>
+        </div>
+        <span className="rounded border border-white/10 bg-black/35 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-400">
+          {trustSnapshot?.aggregate?.voteCount || 0} votes
+        </span>
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-black/35 p-3">
+        <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Active target</div>
+        <div className="mt-1 truncate font-mono text-xs text-slate-300" title={trustTarget}>{trustTarget || "Scan target pending"}</div>
+        <div className="mt-2 text-sm font-black text-white">
+          {leader ? `${leader.label} leads at ${leader.percent}%` : "No community signal yet"}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2">
+        {totals.map((item) => (
+          <div key={item.label}>
+            <div className="mb-1 flex justify-between gap-2 text-xs text-slate-300">
+              <span className="min-w-0 truncate">{item.label}</span>
+              <span>{item.percent || 0}% / {item.weight || 0} weight</span>
+            </div>
+            <div className="h-2 rounded-full bg-white/10">
+              <div
+                className={`h-2 rounded-full ${item.tone === "danger" ? "bg-[#ff4dce]" : item.tone === "warning" ? "bg-[#ffb347]" : item.tone === "safe" ? "bg-[#63ff9d]" : "bg-[#00e7ff]"}`}
+                style={{ width: `${item.percent || 0}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <Field label={userVote ? `Your vote: ${userVote}` : "Cast vote"}>
+          <select
+            value={selectedTrustVote}
+            onChange={(event) => onVoteChange(event.target.value)}
+            className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-[#63ff9d]"
+          >
+            {trustVoteOptions.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </Field>
+        <Field label="Evidence note optional">
+          <textarea
+            value={voteNote}
+            onChange={(event) => onNoteChange(event.target.value)}
+            rows={3}
+            placeholder="Add a reason, source, or correction."
+            className="resize-none rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#63ff9d]"
+          />
+        </Field>
+        <button
+          onClick={onCastVote}
+          disabled={!walletAddress}
+          className="rounded-md border border-[#63ff9d]/30 bg-[#63ff9d]/10 px-3 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#b8ffd0] transition hover:border-[#00e7ff]/45 disabled:cursor-not-allowed disabled:opacity-45"
+          type="button"
+        >
+          Submit weighted vote
+        </button>
+      </div>
+
+      <p className="mt-3 text-xs leading-5 text-slate-400">
+        Credibility: new users 1x, active wallet 1.5x, auditor badge 3x, accurate report history up to 5x,
+        sybil or suspicious accounts 0.25x.
+      </p>
+
+      {communityMessage ? <div className="mt-3 rounded-md border border-[#63ff9d]/30 bg-[#63ff9d]/10 p-3 text-sm text-[#b8ffd0]">{communityMessage}</div> : null}
+      {communityError ? <div className="mt-3 rounded-md border border-[#ffb347]/30 bg-[#ffb347]/10 p-3 text-sm text-[#ffe3ba]">{communityError}</div> : null}
+
+      <button
+        onClick={onAdminOpen}
+        className="mt-4 flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400 transition hover:border-[#ff4dce]/35 hover:text-[#ffc2f6]"
+        type="button"
+      >
+        <span className="flex items-center gap-2"><Crown size={14} /> Admin trust controls</span>
+        <ChevronDown size={15} className={`transition-transform ${adminOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {adminOpen ? (
+        <div className="mt-3 grid gap-3 rounded-lg border border-[#ff4dce]/20 bg-[#ff4dce]/5 p-3">
+          <Field label="Admin key">
+            <input
+              type="password"
+              value={adminKey}
+              onChange={(event) => onAdminKeyChange(event.target.value)}
+              placeholder="Private server admin key"
+              className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
+            />
+          </Field>
+          <Field label="Wallet to update">
+            <input
+              value={adminAddress}
+              onChange={(event) => onAdminAddressChange(event.target.value)}
+              placeholder="0x..."
+              className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
+            />
+          </Field>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Field label="Accurate reports">
+              <input
+                type="number"
+                min="0"
+                max="25"
+                value={adminReports}
+                onChange={(event) => onAdminReportsChange(event.target.value)}
+                className="rounded-md border border-white/10 bg-black/35 px-3 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#ff4dce]"
+              />
+            </Field>
+            <label className="flex items-center gap-2 rounded-md border border-white/10 bg-black/35 px-3 py-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-300">
+              <input type="checkbox" checked={adminAuditor} onChange={(event) => onAdminAuditorChange(event.target.checked)} />
+              Auditor
+            </label>
+            <label className="flex items-center gap-2 rounded-md border border-white/10 bg-black/35 px-3 py-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-300">
+              <input type="checkbox" checked={adminSuspicious} onChange={(event) => onAdminSuspiciousChange(event.target.checked)} />
+              Suspicious
+            </label>
+          </div>
+          <button
+            onClick={onAdminSubmit}
+            className="rounded-md border border-[#ff4dce]/30 bg-[#ff4dce]/10 px-3 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#ffc2f6] transition hover:border-[#00e7ff]/45"
+            type="button"
+          >
+            Update trust profile
+          </button>
+        </div>
+      ) : null}
+    </Panel>
+  );
 }
 
 function ScoreRing({ score, level }) {
@@ -742,6 +1014,23 @@ export default function Home() {
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState("contract");
   const [isFeedbackSending, setIsFeedbackSending] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState(null);
+  const [walletAddress, setWalletAddress] = useState("");
+  const [walletProfile, setWalletProfile] = useState(null);
+  const [walletError, setWalletError] = useState("");
+  const [walletMessage, setWalletMessage] = useState("");
+  const [isWalletBusy, setIsWalletBusy] = useState(false);
+  const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [trustSnapshot, setTrustSnapshot] = useState(null);
+  const [selectedTrustVote, setSelectedTrustVote] = useState("Needs Manual Review");
+  const [voteNote, setVoteNote] = useState("");
+  const [communityMessage, setCommunityMessage] = useState("");
+  const [communityError, setCommunityError] = useState("");
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminKey, setAdminKey] = useState("");
+  const [adminAddress, setAdminAddress] = useState("");
+  const [adminReports, setAdminReports] = useState("0");
+  const [adminAuditor, setAdminAuditor] = useState(false);
+  const [adminSuspicious, setAdminSuspicious] = useState(false);
   const [form, setForm] = useState({
     address: sampleAddress,
     owner: "",
@@ -773,6 +1062,7 @@ export default function Home() {
   const projectTypeConfidence = scanReport?.meta?.projectType?.confidence || "Pending";
   const displayedFindings = scanReport?.findings?.length ? scanReport.findings : fallbackFindings;
   const displayedRiskLabels = scanReport?.riskLabels?.length ? scanReport.riskLabels : fallbackRiskLabels;
+  const trustTarget = scanReport?.meta?.address || form.address;
   const terminalLines = scanReport?.terminal ?? [
     "engine.boot: PulseShield online",
     `chain.profile: ${chainProfile.rpc} / native gas ${chainProfile.native}`,
@@ -811,6 +1101,164 @@ export default function Home() {
 
   function clearSampleAddress() {
     setForm((current) => current.address === sampleAddress ? { ...current, address: "" } : current);
+  }
+
+  async function fetchTrustSnapshot(target = trustTarget, address = walletAddress) {
+    if (!target) return;
+    const params = new URLSearchParams({ target });
+    if (address) params.set("address", address);
+    const response = await fetch(`/api/community?${params.toString()}`);
+    const payload = await response.json();
+    if (payload.ok) {
+      setTrustSnapshot(payload);
+      if (payload.profile) {
+        setWalletProfile(payload.profile);
+        setDisplayNameDraft(payload.profile.displayName || "");
+      }
+    }
+  }
+
+  async function saveWalletProfile(address, displayName, walletActivity = "new") {
+    const response = await fetch("/api/community/profile", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address, displayName, walletActivity }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || "Profile update failed.");
+    setWalletProfile(payload.profile);
+    setDisplayNameDraft(payload.profile?.displayName || "");
+    return payload.profile;
+  }
+
+  async function estimateWalletActivity(address) {
+    try {
+      const count = await window.ethereum.request({ method: "eth_getTransactionCount", params: [address, "latest"] });
+      return Number.parseInt(count, 16) > 0 ? "active" : "new";
+    } catch {
+      return "new";
+    }
+  }
+
+  async function connectWallet() {
+    setIsWalletBusy(true);
+    setWalletError("");
+    setWalletMessage("");
+    try {
+      if (!window.ethereum) throw new Error("No browser wallet detected. Install a Web3 wallet, then reconnect.");
+      try {
+        await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x171" }] });
+      } catch (switchError) {
+        if (switchError?.code === 4902) {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: "0x171",
+              chainName: "PulseChain",
+              nativeCurrency: { name: "Pulse", symbol: "PLS", decimals: 18 },
+              rpcUrls: ["https://rpc.pulsechain.com"],
+              blockExplorerUrls: ["https://scan.pulsechain.com"],
+            }],
+          });
+        }
+      }
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const address = normalizeClientAddress(accounts?.[0]);
+      if (!address) throw new Error("Wallet did not return a valid address.");
+      const walletActivity = await estimateWalletActivity(address);
+      localStorage.setItem("pulseshield.wallet", address);
+      setWalletAddress(address);
+      setAdminAddress(address);
+      await saveWalletProfile(address, undefined, walletActivity);
+      await fetchTrustSnapshot(trustTarget, address);
+      setWalletMessage("Wallet connected to PulseShield trust identity.");
+    } catch (error) {
+      setWalletError(error.message);
+    } finally {
+      setIsWalletBusy(false);
+    }
+  }
+
+  function disconnectWallet() {
+    localStorage.removeItem("pulseshield.wallet");
+    setWalletAddress("");
+    setWalletProfile(null);
+    setDisplayNameDraft("");
+    setWalletMessage("Wallet disconnected from this browser session.");
+  }
+
+  async function saveDisplayName() {
+    if (!walletAddress) {
+      setWalletError("Connect a wallet before saving a display name.");
+      return;
+    }
+    setIsWalletBusy(true);
+    setWalletError("");
+    setWalletMessage("");
+    try {
+      await saveWalletProfile(walletAddress, displayNameDraft, walletProfile?.walletActivity || "new");
+      await fetchTrustSnapshot(trustTarget, walletAddress);
+      setWalletMessage("Display name reserved.");
+    } catch (error) {
+      setWalletError(error.message);
+    } finally {
+      setIsWalletBusy(false);
+    }
+  }
+
+  async function castTrustVote() {
+    setCommunityError("");
+    setCommunityMessage("");
+    if (!walletAddress) {
+      setCommunityError("Connect a wallet before voting.");
+      return;
+    }
+    try {
+      const response = await fetch("/api/community/vote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          address: walletAddress,
+          target: trustTarget,
+          vote: selectedTrustVote,
+          note: voteNote,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Vote failed.");
+      setTrustSnapshot((current) => ({ ...(current || {}), ok: true, aggregate: payload.aggregate, profile: payload.profile, userVote: payload.userVote }));
+      setWalletProfile(payload.profile);
+      setVoteNote("");
+      setCommunityMessage("Community trust vote recorded.");
+    } catch (error) {
+      setCommunityError(error.message);
+    }
+  }
+
+  async function submitAdminUpdate() {
+    setCommunityError("");
+    setCommunityMessage("");
+    try {
+      const response = await fetch("/api/community/admin", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          adminKey,
+          address: adminAddress,
+          auditorBadge: adminAuditor,
+          accurateReports: adminReports,
+          suspicious: adminSuspicious,
+          status: adminSuspicious ? "suspicious" : "active",
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Admin update failed.");
+      if (payload.profile?.address === walletAddress) setWalletProfile(payload.profile);
+      await fetchTrustSnapshot(trustTarget, walletAddress);
+      setCommunityMessage("Admin trust profile updated.");
+    } catch (error) {
+      setCommunityError(error.message);
+    }
   }
 
   async function runScan() {
@@ -885,6 +1333,32 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
+    const savedWallet = normalizeClientAddress(localStorage.getItem("pulseshield.wallet"));
+    if (savedWallet) {
+      setWalletAddress(savedWallet);
+      setAdminAddress(savedWallet);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTrustSnapshot(trustTarget, walletAddress).catch(() => null);
+  }, [trustTarget, walletAddress]);
+
+  useEffect(() => {
+    if (!window.ethereum?.on) return undefined;
+    function onAccountsChanged(accounts) {
+      const address = normalizeClientAddress(accounts?.[0]);
+      if (address) {
+        localStorage.setItem("pulseshield.wallet", address);
+        setWalletAddress(address);
+        setAdminAddress(address);
+        saveWalletProfile(address, undefined, "active").catch(() => null);
+      } else {
+        disconnectWallet();
+      }
+    }
+    window.ethereum.on("accountsChanged", onAccountsChanged);
+    return () => window.ethereum?.removeListener?.("accountsChanged", onAccountsChanged);
   }, []);
 
   return (
@@ -1442,29 +1916,44 @@ export default function Home() {
               </div>
             </Panel>
 
-            <Panel className="uhd-panel p-4">
-              <h2 className="mb-3 flex items-center gap-2 text-lg font-bold">
-                <Vote size={18} className="text-[#63ff9d]" />
-                Community Trust Voting
-              </h2>
-              <div className="grid gap-2">
-                {votes.map(([label, percent, className]) => (
-                  <div key={label}>
-                    <div className="mb-1 flex justify-between text-xs text-slate-300">
-                      <span>{label}</span>
-                      <span>{percent}%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-white/10">
-                      <div className="h-2 rounded-full bg-[#63ff9d]" style={{ width: `${percent}%`, opacity: className === "auditor" ? 1 : 0.58 }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-slate-400">
-                Credibility: new users 1x, verified wallet age 1.5x, auditor badge 3x, past accurate reports 5x,
-                sybil-suspicious accounts 0.25x.
-              </p>
-            </Panel>
+            <WalletIdentityPanel
+              walletAddress={walletAddress}
+              walletProfile={walletProfile}
+              walletError={walletError}
+              walletMessage={walletMessage}
+              displayNameDraft={displayNameDraft}
+              isWalletBusy={isWalletBusy}
+              onConnect={connectWallet}
+              onDisconnect={disconnectWallet}
+              onNameChange={setDisplayNameDraft}
+              onSaveName={saveDisplayName}
+            />
+
+            <CommunityTrustPanel
+              trustSnapshot={trustSnapshot}
+              trustTarget={trustTarget}
+              selectedTrustVote={selectedTrustVote}
+              voteNote={voteNote}
+              walletAddress={walletAddress}
+              communityMessage={communityMessage}
+              communityError={communityError}
+              adminOpen={adminOpen}
+              adminKey={adminKey}
+              adminAddress={adminAddress}
+              adminReports={adminReports}
+              adminAuditor={adminAuditor}
+              adminSuspicious={adminSuspicious}
+              onVoteChange={setSelectedTrustVote}
+              onNoteChange={setVoteNote}
+              onCastVote={castTrustVote}
+              onAdminOpen={() => setAdminOpen(!adminOpen)}
+              onAdminKeyChange={setAdminKey}
+              onAdminAddressChange={setAdminAddress}
+              onAdminReportsChange={setAdminReports}
+              onAdminAuditorChange={setAdminAuditor}
+              onAdminSuspiciousChange={setAdminSuspicious}
+              onAdminSubmit={submitAdminUpdate}
+            />
           </div>
         </div>
 

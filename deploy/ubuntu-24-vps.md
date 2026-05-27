@@ -73,6 +73,8 @@ Minimum values:
 ```bash
 PULSECHAIN_RPC_URL=https://rpc.pulsechain.com
 PULSECHAIN_EXPLORER_API=https://scan.pulsechain.com/api
+PULSESHIELD_DATA_DIR=/data/pulseshield
+PULSESHIELD_ADMIN_KEY=GENERATE_A_LONG_PRIVATE_ADMIN_KEY
 ```
 
 Feedback email relay:
@@ -176,7 +178,13 @@ The current production service includes the live Next.js backend routes:
 
 - `/api/scan`
 - `/api/market`
+- `/api/community`
+- `/api/community/profile`
+- `/api/community/vote`
+- `/api/community/admin`
 - `/api/feedback`
 - `/api/health`
+
+The Docker compose file mounts a persistent `pulseshield-data` volume at `/data/pulseshield` so community profiles, display names, trust votes, and admin reputation metadata survive app rebuilds.
 
 The VPS has enough RAM to add worker containers later for Slither, Mythril, Semgrep, queue processing, Supabase sync, report caching, or a private RPC/indexing layer.

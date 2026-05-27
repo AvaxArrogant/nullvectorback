@@ -50,6 +50,26 @@ Invoke-RestMethod -Uri http://localhost:3000/api/market -Method Post -ContentTyp
 
 The market endpoint uses DexScreener token-pair data to rank active trading pairs, summarize live price/liquidity/volume/trade-flow, generate chart-ready market data, and attach market-context warnings.
 
+Community trust voting:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/api/community?target=0xA1077a294dde1B09bb078844df40758a5D0f9a27"
+
+Invoke-RestMethod -Uri http://localhost:3000/api/community/profile -Method Post -ContentType 'application/json' -Body (@{
+  address='0x0000000000000000000000000000000000000001'
+  displayName='PulseAuditor'
+} | ConvertTo-Json)
+
+Invoke-RestMethod -Uri http://localhost:3000/api/community/vote -Method Post -ContentType 'application/json' -Body (@{
+  address='0x0000000000000000000000000000000000000001'
+  target='0xA1077a294dde1B09bb078844df40758a5D0f9a27'
+  vote='Needs Manual Review'
+  note='Proxy admin should be reviewed before deposits.'
+} | ConvertTo-Json)
+```
+
+The community system persists wallet profiles, unique display names, one weighted vote per wallet per contract, admin trust badges, suspicious-account penalties, and aggregate trust scores. Set `PULSESHIELD_DATA_DIR` to a persistent path in production and protect `PULSESHIELD_ADMIN_KEY`.
+
 Feedback submissions:
 
 ```powershell
@@ -72,6 +92,8 @@ Recommended: Vercel, because this is a Next.js app with API routes.
 4. Add environment variables from `.env.example`:
    - `PULSECHAIN_RPC_URL`
    - `PULSECHAIN_EXPLORER_API`
+   - `PULSESHIELD_DATA_DIR`
+   - `PULSESHIELD_ADMIN_KEY`
    - `FEEDBACK_TO_EMAIL`
    - `SMTP_HOST`
    - `SMTP_PORT`
