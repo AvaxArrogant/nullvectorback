@@ -159,6 +159,13 @@ cd /srv/pulseshield/app
 docker compose logs -f --tail=120
 ```
 
+Repair community data volume permissions:
+
+```bash
+cd /srv/nullvector/app
+docker compose exec -u root pulseshield sh -lc 'chown -R 1001:1001 /data/pulseshield && chmod -R u+rwX,g+rwX /data/pulseshield'
+```
+
 Restart:
 
 ```bash
